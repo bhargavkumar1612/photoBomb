@@ -1,0 +1,937 @@
+openapi: 3.0.3
+info:
+  title: PhotoBomb API
+  version: 1.0.0
+  description: |
+    Production-ready photo service API supporting uploads, metadata management, 
+    search, albums, and sharing with presigned URLs and async processing.
+  contact:
+    name: PhotoBomb Team
+    email: api@photobomb.example.com
+
+servers:
+  - url: https://api.photobomb.example.com/api/v1
+    description: Production
+  - url: https://api-staging.photobomb.example.com/api/v1
+    description: Staging
+  - url: http://localhost:8000/api/v1
+    description: Local development
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: auth
+    description: Authentication and user management
+  - name: upload
+    description: Photo upload operations
+  - name: photos
+    description: Photo metadata and retrieval
+  - name: albums
+    description: Album management
+  - name: search
+    description: Search and discovery
+  - name: sharing
+    description: Share links and permissions
+  - name: admin
+    description: Administrative operations
+
+paths:
+  /auth/register:
+    post:
+      tags: [auth]
+      summary: Register new user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, full_name]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                password:
+                  type: string
+                  format: password
+                  minLength: 12
+                  example: "MySecureP@ssw0rd123"
+                full_name:
+                  type: string
+                  example: "Jane Doe"
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: Email already registered
+
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Login with email/password
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Invalid credentials
+
+  /auth/refresh:
+    post:
+      tags: [auth]
+      summary: Refresh access token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
+                  example: "eyJhbGciOiJIUzI1NiIsInR5cCI6..."
+      responses:
+        '200':
+          description: New access token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                  expires_in:
+                    type: integer
+                    example: 3600
+        '401':
+          description: Invalid or expired refresh token
+
+  /auth/oauth/google:
+    get:
+      tags: [auth]
+      summary: Initiate Google OAuth flow
+      security: []
+      responses:
+        '302':
+          description: Redirect to Google OAuth consent page
+
+  /auth/oauth/google/callback:
+    get:
+      tags: [auth]
+      summary: Google OAuth callback
+      security: []
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to app with tokens in URL fragment
+
+  /upload/presign:
+    post:
+      tags: [upload]
+      summary: Get presigned upload URL
+      description: |
+        Request a presigned URL for direct browser-to-B2 upload.
+        Includes duplicate detection based on SHA256.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [filename, size_bytes, mime_type, sha256]
+              properties:
+                filename:
+                  type: string
+                  example: "IMG_1234.jpg"
+                size_bytes:
+                  type: integer
+                  example: 5242880
+                  description: File size in bytes
+                mime_type:
+                  type: string
+                  example: "image/jpeg"
+                  enum: [image/jpeg, image/png, image/heic, image/webp, image/avif]
+                sha256:
+                  type: string
+                  example: "a3c8f9e7b2d4..."
+                  description: Hex-encoded SHA256 hash (computed client-side)
+      responses:
+        '200':
+          description: Presigned URL generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  upload_id:
+                    type: string
+                    format: uuid
+                  presigned_url:
+                    type: string
+                    format: uri
+                    description: B2 presigned upload URL (15min expiry)
+                  multipart_chunk_size:
+                    type: integer
+                    example: 5242880
+                    description: Recommended chunk size for multipart upload
+                  expires_at:
+                    type: string
+                    format: date-time
+        '409':
+          description: Duplicate photo detected
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "duplicate"
+                  photo_id:
+                    type: string
+                    format: uuid
+                  message:
+                    type: string
+                    example: "This photo was already uploaded on 2024-01-15"
+
+  /upload/confirm:
+    post:
+      tags: [upload]
+      summary: Confirm upload completion
+      description: |
+        Notify server that upload to B2 is complete. Triggers async processing job.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [upload_id]
+              properties:
+                upload_id:
+                  type: string
+                  format: uuid
+                etags:
+                  type: array
+                  items:
+                    type: string
+                  description: ETags from multipart upload (optional, for verification)
+      responses:
+        '202':
+          description: Upload confirmed, processing queued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  photo_id:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    example: "processing"
+                  estimated_completion:
+                    type: integer
+                    example: 30
+                    description: Estimated seconds until thumbnails ready
+        '404':
+          description: upload_id not found
+
+  /photos:
+    get:
+      tags: [photos]
+      summary: List user's photos (timeline)
+      parameters:
+        - name: cursor
+          in: query
+          schema:
+            type: string
+          description: Pagination cursor (base64-encoded timestamp)
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 200
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [created_desc, created_asc, taken_desc, taken_asc]
+            default: taken_desc
+      responses:
+        '200':
+          description: Photo list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  photos:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Photo'
+                  next_cursor:
+                    type: string
+                    nullable: true
+                  has_more:
+                    type: boolean
+
+  /photos/{photo_id}:
+    get:
+      tags: [photos]
+      summary: Get photo metadata
+      parameters:
+        - name: photo_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Photo details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhotoDetailed'
+        '404':
+          description: Photo not found
+
+    patch:
+      tags: [photos]
+      summary: Update photo metadata
+      parameters:
+        - name: photo_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                caption:
+                  type: string
+                  maxLength: 2000
+                favorite:
+                  type: boolean
+                archived:
+                  type: boolean
+      responses:
+        '200':
+          description: Photo updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Photo'
+
+    delete:
+      tags: [photos]
+      summary: Soft-delete photo
+      parameters:
+        - name: photo_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Photo deleted (moved to trash)
+
+  /search:
+    post:
+      tags: [search]
+      summary: Search photos
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                query:
+                  type: string
+                  example: "sunset beach"
+                  description: Text search (EXIF, captions)
+                filters:
+                  type: object
+                  properties:
+                    date_range:
+                      type: object
+                      properties:
+                        start:
+                          type: string
+                          format: date
+                        end:
+                          type: string
+                          format: date
+                    location:
+                      type: object
+                      properties:
+                        lat:
+                          type: number
+                        lng:
+                          type: number
+                        radius_km:
+                          type: number
+                    face_id:
+                      type: string
+                      format: uuid
+                      description: Find photos with this person (requires face opt-in)
+                limit:
+                  type: integer
+                  default: 50
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Photo'
+                  total:
+                    type: integer
+
+  /albums:
+    get:
+      tags: [albums]
+      summary: List user's albums
+      responses:
+        '200':
+          description: Album list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Album'
+
+    post:
+      tags: [albums]
+      summary: Create album
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title:
+                  type: string
+                  example: "Summer Vacation 2024"
+                description:
+                  type: string
+                photo_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+      responses:
+        '201':
+          description: Album created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Album'
+
+  /albums/{album_id}:
+    get:
+      tags: [albums]
+      summary: Get album details
+      parameters:
+        - name: album_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Album with photos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlbumDetailed'
+
+    patch:
+      tags: [albums]
+      summary: Update album
+      parameters:
+        - name: album_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                add_photo_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                remove_photo_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+      responses:
+        '200':
+          description: Album updated
+
+    delete:
+      tags: [albums]
+      summary: Delete album
+      parameters:
+        - name: album_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Album deleted (photos preserved)
+
+  /shares:
+    post:
+      tags: [sharing]
+      summary: Create share link
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [photo_ids]
+              properties:
+                photo_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                album_id:
+                  type: string
+                  format: uuid
+                  description: Alternative to photo_ids (shares entire album)
+                expiry_hours:
+                  type: integer
+                  default: 168
+                  example: 168
+                  description: Link expiry (default 7 days)
+                password:
+                  type: string
+                  description: Optional password protection
+                allow_download:
+                  type: boolean
+                  default: false
+      responses:
+        '201':
+          description: Share created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  share_id:
+                    type: string
+                    format: uuid
+                  slug:
+                    type: string
+                    example: "aB3xY9k2"
+                  share_url:
+                    type: string
+                    example: "https://photobomb.app/s/aB3xY9k2"
+                  expires_at:
+                    type: string
+                    format: date-time
+
+  /s/{slug}:
+    get:
+      tags: [sharing]
+      summary: View shared photos (public endpoint)
+      security: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Share page HTML or JSON (based on Accept header)
+          content:
+            text/html:
+              schema:
+                type: string
+            application/json:
+              schema:
+                type: object
+                properties:
+                  photos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        thumb_url:
+                          type: string
+                          description: Signed CDN URL (1hr expiry)
+        '404':
+          description: Share not found or expired
+
+  /s/{slug}/unlock:
+    post:
+      tags: [sharing]
+      summary: Unlock password-protected share
+      security: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Password correct, session JWT in cookie
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+                example: "share_session=eyJhbGc...; HttpOnly; Secure; SameSite=Strict; Max-Age=3600"
+        '401':
+          description: Invalid password
+
+  /admin/jobs:
+    get:
+      tags: [admin]
+      summary: List processing jobs (admin only)
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [queued, processing, completed, failed]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+      responses:
+        '200':
+          description: Job list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    job_id:
+                      type: string
+                    upload_id:
+                      type: string
+                    status:
+                      type: string
+                    created_at:
+                      type: string
+                      format: date-time
+                    completed_at:
+                      type: string
+                      format: date-time
+                      nullable: true
+                    error:
+                      type: string
+                      nullable: true
+
+  /internal/webhooks/processing_complete:
+    post:
+      tags: [admin]
+      summary: Processing complete callback (internal only)
+      security:
+        - internalApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [upload_id, photo_id, status]
+              properties:
+                upload_id:
+                  type: string
+                  format: uuid
+                photo_id:
+                  type: string
+                  format: uuid
+                status:
+                  type: string
+                  enum: [success, failed]
+                error:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Webhook received
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    internalApiKey:
+      type: apiKey
+      in: header
+      name: X-Internal-API-Key
+
+  schemas:
+    AuthResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        refresh_token:
+          type: string
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6..."
+        expires_in:
+          type: integer
+          example: 3600
+          description: Access token TTL in seconds
+        user:
+          $ref: '#/components/schemas/User'
+
+    User:
+      type: object
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        full_name:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        face_recognition_enabled:
+          type: boolean
+          description: User has opted in to face recognition
+
+    Photo:
+      type: object
+      properties:
+        photo_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        filename:
+          type: string
+        mime_type:
+          type: string
+        size_bytes:
+          type: integer
+        sha256:
+          type: string
+        taken_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: From EXIF DateTimeOriginal
+        uploaded_at:
+          type: string
+          format: date-time
+        thumb_urls:
+          type: object
+          properties:
+            thumb_256:
+              type: string
+              format: uri
+            thumb_512:
+              type: string
+              format: uri
+            thumb_1024:
+              type: string
+              format: uri
+        caption:
+          type: string
+          nullable: true
+        favorite:
+          type: boolean
+        archived:
+          type: boolean
+
+    PhotoDetailed:
+      allOf:
+        - $ref: '#/components/schemas/Photo'
+        - type: object
+          properties:
+            exif:
+              type: object
+              properties:
+                camera_make:
+                  type: string
+                camera_model:
+                  type: string
+                lens:
+                  type: string
+                iso:
+                  type: integer
+                aperture:
+                  type: string
+                shutter_speed:
+                  type: string
+                focal_length:
+                  type: string
+                gps_lat:
+                  type: number
+                  nullable: true
+                gps_lng:
+                  type: number
+                  nullable: true
+            original_url:
+              type: string
+              format: uri
+              description: Signed download URL (5min expiry)
+            faces:
+              type: array
+              items:
+                type: object
+                properties:
+                  face_id:
+                    type: string
+                    format: uuid
+                  bounding_box:
+                    type: object
+                    properties:
+                      x:
+                        type: number
+                      y:
+                        type: number
+                      width:
+                        type: number
+                      height:
+                        type: number
+
+    Album:
+      type: object
+      properties:
+        album_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        cover_photo_id:
+          type: string
+          format: uuid
+          nullable: true
+        photo_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    AlbumDetailed:
+      allOf:
+        - $ref: '#/components/schemas/Album'
+        - type: object
+          properties:
+            photos:
+              type: array
+              items:
+                $ref: '#/components/schemas/Photo'
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              details:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    field:
+                      type: string
+                    message:
+                      type: string

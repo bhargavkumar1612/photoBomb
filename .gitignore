@@ -1,0 +1,27 @@
+# Environment files
+.env
+.env.local
+*.env
+
+# IDEs
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfvars
+crash.log
+
+# Secrets
+secrets/
+*.key
+*.pem
+
+# Logs
+*.log

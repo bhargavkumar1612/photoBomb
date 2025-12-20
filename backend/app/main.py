@@ -1,0 +1,71 @@
+"""
+Main FastAPI application entry point.
+"""
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
+
+from app.core.config import settings
+from app.core.database import init_db, close_db
+from app.api import auth, upload, photos, albums
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan events."""
+    # Startup
+    await init_db()
+    yield
+    # Shutdown
+    await close_db()
+
+
+# Create FastAPI app
+app = FastAPI(
+    title=settings.APP_NAME,
+    version="1.0.0",
+    description="Privacy-first photo service - Google Photos alternative",
+    lifespan=lifespan,
+)
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.allowed_origins_list,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Security headers middleware
+@app.middleware("http")
+async def add_security_headers(request, call_next):
+    response = await call_next(request)
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    return response
+
+# Include routers
+app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
+app.include_router(upload.router, prefix="/api/v1/upload", tags=["upload"])
+app.include_router(photos.router, prefix="/api/v1/photos", tags=["photos"])
+app.include_router(albums.router, prefix="/api/v1/albums", tags=["albums"])
+
+
+@app.get("/")
+async def root():
+    """API root endpoint."""
+    return {
+        "name": settings.APP_NAME,
+        "version": "1.0.0",
+        "status": "running"
+    }
+
+
+@app.get("/healthz")
+async def health_check():
+    """Health check endpoint for monitoring."""
+    return {"status": "healthy"}

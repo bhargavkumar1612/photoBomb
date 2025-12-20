@@ -1,0 +1,676 @@
+/* Modern PhotoBomb Design - Inspired by Reference */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+    background: #f8f9fa;
+    color: #1a1a1a;
+}
+
+/* Timeline Container */
+.timeline-container {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Header */
+.timeline-header {
+    background: white;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 20px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.timeline-header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    color: #4f46e5;
+    letter-spacing: -0.5px;
+}
+
+.timeline-header p {
+    color: #6b7280;
+    font-size: 14px;
+    margin-top: 2px;
+}
+
+.header-actions {
+    display: flex;
+    gap: 12px;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 10px 24px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 14px;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+}
+
+.btn-secondary {
+    background: white;
+    color: #4b5563;
+    padding: 10px 24px;
+    border-radius: 8px;
+    border: 1px solid #d1d5db;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+    background: #f9fafb;
+    border-color: #9ca3af;
+}
+
+/* Toolbar */
+.timeline-toolbar {
+    background: white;
+    padding: 16px 40px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    flex-wrap: wrap;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.grid-size-selector,
+.filter-buttons,
+.selection-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.grid-size-selector button,
+.filter-buttons button,
+.selection-controls button {
+    padding: 8px 16px;
+    border: 1px solid #e5e7eb;
+    background: white;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    color: #374151;
+    transition: all 0.2s;
+}
+
+.grid-size-selector button:hover,
+.filter-buttons button:hover,
+.selection-controls button:hover {
+    background: #f9fafb;
+    border-color: #667eea;
+}
+
+.grid-size-selector button.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-color: transparent;
+}
+
+.filter-buttons button.active {
+    background: #fef3c7;
+    border-color: #fcd34d;
+    color: #92400e;
+}
+
+.selection-controls button.danger {
+    color: #dc2626;
+    border-color: #fecaca;
+}
+
+.selection-controls button.danger:hover {
+    background: #fef2f2;
+    border-color: #dc2626;
+}
+
+/* Timeline Content */
+.timeline-content {
+    flex: 1;
+    padding: 40px;
+    max-width: 1400px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+/* Photo Groups */
+.photo-group {
+    margin-bottom: 48px;
+}
+
+.date-header {
+    font-size: 20px;
+    font-weight: 700;
+    color: #1f2937;
+    margin-bottom: 20px;
+    padding-left: 4px;
+    position: relative;
+}
+
+.date-header::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: -4px;
+    width: 60px;
+    height: 3px;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    border-radius: 2px;
+}
+
+/* Photo Grid */
+.photo-grid {
+    display: grid;
+    gap: 20px;
+}
+
+.photo-grid.grid-compact {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+}
+
+.photo-grid.grid-comfortable {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 20px;
+}
+
+.photo-grid.grid-cozy {
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 24px;
+}
+
+/* Photo Card */
+.photo-card {
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+    background: white;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+}
+
+.photo-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+}
+
+.photo-card.selected {
+    outline: 3px solid #667eea;
+    outline-offset: 2px;
+}
+
+.photo-card img {
+    width: 100%;
+    height: 240px;
+    object-fit: cover;
+    display: block;
+}
+
+.photo-grid.grid-compact .photo-card img {
+    height: 180px;
+}
+
+.photo-grid.grid-cozy .photo-card img {
+    height: 320px;
+}
+
+/* Overlay Buttons */
+.photo-checkbox {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    z-index: 10;
+    accent-color: #667eea;
+}
+
+.favorite-btn {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    color: #fbbf24;
+    border: none;
+    border-radius: 8px;
+    width: 40px;
+    height: 40px;
+    font-size: 20px;
+    cursor: pointer;
+    opacity: 0;
+    transition: all 0.2s;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.photo-card:hover .favorite-btn {
+    opacity: 1;
+}
+
+.favorite-btn.favorited {
+    opacity: 1;
+    color: #f59e0b;
+    background: rgba(254, 243, 199, 0.95);
+}
+
+.favorite-btn:hover {
+    transform: scale(1.1);
+}
+
+.delete-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    color: #ef4444;
+    border: none;
+    border-radius: 8px;
+    width: 40px;
+    height: 40px;
+    font-size: 18px;
+    cursor: pointer;
+    opacity: 0;
+    transition: all 0.2s;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.photo-card:hover .delete-btn {
+    opacity: 1;
+}
+
+.delete-btn:hover {
+    transform: scale(1.1);
+    background: rgba(254, 226, 226, 0.95);
+}
+
+.delete-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Caption */
+.photo-caption {
+    padding: 12px 16px;
+    font-size: 13px;
+    color: #6b7280;
+    background: white;
+    border-top: 1px solid #f3f4f6;
+}
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: 80px 20px;
+}
+
+.empty-state h2 {
+    font-size: 24px;
+    color: #1f2937;
+    margin-bottom: 12px;
+}
+
+.empty-state p {
+    font-size: 16px;
+    color: #6b7280;
+    margin-bottom: 24px;
+}
+
+/* Loading/Error States */
+.loading,
+.error {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 400px;
+    font-size: 18px;
+    color: #6b7280;
+}
+
+.error {
+    color: #dc2626;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+
+    .timeline-header,
+    .timeline-toolbar,
+    .timeline-content {
+        padding-left: 20px;
+        padding-right: 20px;
+    }
+
+    .timeline-header {
+        flex-direction: column;
+        gap: 16px;
+        align-items: flex-start;
+    }
+
+    .header-actions {
+        width: 100%;
+    }
+
+    .header-actions button,
+    .header-actions a {
+        flex: 1;
+        text-align: center;
+    }
+
+    .timeline-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .grid-size-selector,
+    .filter-buttons,
+    .selection-controls {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .photo-grid.grid-compact,
+    .photo-grid.grid-comfortable,
+    .photo-grid.grid-cozy {
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    }
+}
+
+/* Masonry Grid */
+.masonry-grid {
+    display: flex;
+    margin-left: -20px;
+    width: auto;
+}
+
+.masonry-column {
+    padding-left: 20px;
+    background-clip: padding-box;
+}
+
+.masonry-column>.photo-card {
+    margin-bottom: 20px;
+}
+
+/* Timeline Wrapper */
+.timeline-wrapper {
+    min-height: 100vh;
+}
+
+.btn-upload {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.toolbar-left,
+.toolbar-right {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.toolbar-left h1 {
+    font-size: 24px;
+    margin: 0;
+}
+
+/* Enhanced Photo Overlay */
+.photo-overlay {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.photo-card:hover .photo-overlay {
+    opacity: 1;
+}
+
+.overlay-bottom {
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    right: 12px;
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+}
+
+.overlay-btn {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border: none;
+    border-radius: 8px;
+    width: 40px;
+    height: 40px;
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.overlay-btn:hover {
+    transform: scale(1.1);
+    background: white;
+}
+
+/* Toolbar Button Styling */
+.timeline-toolbar button {
+    background: white;
+    border: 1px solid #e5e7eb;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: #374151;
+}
+
+.timeline-toolbar button:hover:not(:disabled) {
+    border-color: #667eea;
+    color: #667eea;
+    background: #f9fafb;
+}
+
+.timeline-toolbar button.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-color: transparent;
+}
+
+.timeline-toolbar button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.timeline-toolbar button.danger {
+    border-color: #fecaca;
+    color: #dc2626;
+}
+
+.timeline-toolbar button.danger:hover:not(:disabled) {
+    background: #fef2f2;
+    border-color: #dc2626;
+}
+
+.btn-upload {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    color: white !important;
+    border: none !important;
+}
+
+.btn-upload:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+/* Fix: Allow clicks through overlay to reach image */
+.photo-overlay {
+    pointer-events: none;
+}
+
+.photo-overlay button {
+    pointer-events: auto;
+}
+
+.photo-card img {
+    cursor: pointer;
+}
+
+
+/* Album Picker Modal */
+.album-picker-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.album-picker-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 8px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+    width: 100%;
+}
+
+.album-picker-item:hover {
+    background-color: #f3f4f6;
+    border-color: #d1d5db;
+}
+
+.album-picker-cover {
+    width: 48px;
+    height: 48px;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #e5e7eb;
+    flex-shrink: 0;
+}
+
+.album-picker-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.album-picker-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+}
+
+.album-picker-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.album-picker-name {
+    font-weight: 600;
+    color: #1f2937;
+    font-size: 15px;
+}
+
+.album-picker-count {
+    color: #6b7280;
+    font-size: 13px;
+}
+
+.empty-picker {
+    text-align: center;
+    padding: 24px;
+    color: #6b7280;
+}
+
+.btn-link {
+    color: #667eea;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+/* Album Detail */
+.album-detail-header {
+    background: white;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 24px 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.btn-back {
+    background: none;
+    border: none;
+    color: #667eea;
+    font-weight: 600;
+    cursor: pointer;
+    align-self: flex-start;
+    padding: 0;
+}
+
+.album-detail-info h1 {
+    font-size: 32px;
+    font-weight: 700;
+    color: #1f2937;
+    margin-bottom: 8px;
+}
+
+.album-detail-count {
+    display: inline-block;
+    background: #e5e7eb;
+    padding: 4px 12px;
+    border-radius: 16px;
+    font-size: 13px;
+    font-weight: 500;
+}

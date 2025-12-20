@@ -1,0 +1,149 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: thumbnail-worker
+  namespace: photobomb
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: thumbnail-worker
+  template:
+    metadata:
+      labels:
+        app: thumbnail-worker
+    spec:
+      containers:
+      - name: worker
+        image: gcr.io/PROJECT_ID/photobomb-worker:latest
+        command: ["celery"]
+        args:
+          - "-A"
+          - "celery_app"
+          - "worker"
+          - "-Q"
+          - "high"
+          - "-c"
+          - "4"
+          - "--loglevel=info"
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: database-secret
+              key: url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: redis-secret
+              key: url
+        - name: B2_APPLICATION_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: b2-secret
+              key: key_id
+        - name: B2_APPLICATION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: b2-secret
+              key: key
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        livenessProbe:
+          exec:
+            command:
+            - celery
+            - -A
+            - celery_app
+            - inspect
+            - ping
+          initialDelaySeconds: 30
+          periodSeconds: 60
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: thumbnail-worker-hpa
+  namespace: photobomb
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: thumbnail-worker
+  minReplicas: 2
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: External
+    external:
+      metric:
+        name: redis.queue.depth
+      target:
+        type: Value
+        value: "100"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: face-worker
+  namespace: photobomb
+spec:
+  replicas: 0 # Scale to zero when idle
+  selector:
+    matchLabels:
+      app: face-worker
+  template:
+    metadata:
+      labels:
+        app: face-worker
+    spec:
+      nodeSelector:
+        workload: gpu
+      tolerations:
+      - key: "nvidia.com/gpu"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+      containers:
+      - name: worker
+        image: gcr.io/PROJECT_ID/photobomb-worker-gpu:latest
+        command: ["celery"]
+        args:
+          - "-A"
+          - "celery_app"
+          - "worker"
+          - "-Q"
+          - "low"
+          - "-c"
+          - "2"
+          - "--loglevel=info"
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: database-secret
+              key: url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: redis-secret
+              key: url
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "2000m"
+            nvidia.com/gpu: 1
+          limits:
+            memory: "8Gi"
+            cpu: "4000m"
+            nvidia.com/gpu: 1

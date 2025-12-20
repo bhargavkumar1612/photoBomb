@@ -1,0 +1,161 @@
+/* Settings Page Styles */
+.settings-container {
+    padding: 40px;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.settings-header {
+    margin-bottom: 32px;
+}
+
+.settings-header h1 {
+    font-size: 32px;
+    font-weight: 700;
+    color: #1f2937;
+}
+
+.settings-content {
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+}
+
+.settings-section h2 {
+    font-size: 20px;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 16px;
+}
+
+.settings-card {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.setting-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 0;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.setting-row:last-child {
+    border-bottom: none;
+}
+
+.setting-row label {
+    font-weight: 600;
+    color: #6b7280;
+    font-size: 14px;
+}
+
+.setting-row span {
+    color: #1f2937;
+    font-size: 15px;
+}
+
+.setting-row .mono {
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    background: #f3f4f6;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.setting-row select {
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+/* Storage Visual */
+.storage-visual {
+    padding: 16px 0;
+}
+
+.storage-bar-large {
+    height: 24px;
+    background: #e5e7eb;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 20px;
+}
+
+.storage-used-large {
+    height: 100%;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px;
+    transition: width 0.3s ease;
+}
+
+.storage-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+}
+
+.storage-stats>div {
+    text-align: center;
+}
+
+.storage-stats label {
+    display: block;
+    font-size: 13px;
+    color: #6b7280;
+    margin-bottom: 4px;
+}
+
+.storage-stats strong {
+    display: block;
+    font-size: 18px;
+    color: #1f2937;
+}
+
+/* Danger Zone */
+.danger-zone {
+    border: 2px solid #fecaca;
+    background: #fef2f2;
+}
+
+.btn-danger {
+    background: #dc2626;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-right: 12px;
+    transition: background 0.2s;
+}
+
+.btn-danger:hover:not(:disabled) {
+    background: #b91c1c;
+}
+
+.btn-danger:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+    .settings-container {
+        padding: 20px;
+    }
+
+    .storage-stats {
+        grid-template-columns: 1fr;
+    }
+
+    .setting-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+}
