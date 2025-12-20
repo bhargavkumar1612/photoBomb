@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import HorizontalLoader from './HorizontalLoader'
+import { Heart, Trash2, Download, Info, Share2, FolderPlus, Loader2 } from 'lucide-react'
 
 export default function PhotoItem({
     photo,
@@ -61,7 +62,7 @@ export default function PhotoItem({
                         onClick={(e) => { e.stopPropagation(); onFavorite(photo.photo_id) }}
                         title={photo.favorite ? "Remove from favorites" : "Add to favorites"}
                     >
-                        {photo.favorite ? '⭐' : '☆'}
+                        <Heart size={20} fill={photo.favorite ? "currentColor" : "none"} strokeWidth={2} />
                     </button>
 
                     <button
@@ -70,14 +71,22 @@ export default function PhotoItem({
                         disabled={isDeleting}
                         title="Delete"
                     >
-                        {isDeleting ? '...' : '🗑️'}
+                        {isDeleting ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={20} />}
                     </button>
 
                     <div className="overlay-bottom">
-                        <button className="overlay-btn" onClick={(e) => { e.stopPropagation(); onDownload(photo) }} title="Download">⬇️</button>
-                        <button className="overlay-btn" onClick={(e) => { e.stopPropagation(); onInfo(photo) }} title="Info">ℹ️</button>
-                        <button className="overlay-btn" onClick={(e) => { e.stopPropagation(); onShare(photo) }} title="Share">🔗</button>
-                        <button className="overlay-btn" onClick={(e) => { e.stopPropagation(); onAddToAlbum(photo) }} title="Add to album">➕</button>
+                        <button className="overlay-btn" onClick={(e) => { e.stopPropagation(); onDownload(photo) }} title="Download">
+                            <Download size={18} />
+                        </button>
+                        <button className="overlay-btn" onClick={(e) => { e.stopPropagation(); onInfo(photo) }} title="Info">
+                            <Info size={18} />
+                        </button>
+                        <button className="overlay-btn" onClick={(e) => { e.stopPropagation(); onShare(photo) }} title="Share">
+                            <Share2 size={18} />
+                        </button>
+                        <button className="overlay-btn" onClick={(e) => { e.stopPropagation(); onAddToAlbum(photo) }} title="Add to album">
+                            <FolderPlus size={18} />
+                        </button>
                     </div>
                 </div>
             )}

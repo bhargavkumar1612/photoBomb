@@ -1,10 +1,13 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import HorizontalLoader from './HorizontalLoader'
+import { X, ChevronLeft, ChevronRight, Download, Calendar, HardDrive, FileType } from 'lucide-react'
 import './Lightbox.css'
 
 export default function Lightbox({ photo, photos, onClose, onNavigate }) {
     const [currentIndex, setCurrentIndex] = useState(0)
     const [loading, setLoading] = useState(true)
+    const [showControls, setShowControls] = useState(true)
+    const controlsTimeoutRef = useRef(null)
 
     useEffect(() => {
         if (photo && photos && photos.length > 0) {
@@ -15,12 +18,51 @@ export default function Lightbox({ photo, photos, onClose, onNavigate }) {
         }
     }, [photo?.photo_id])
 
+    // Reset loading state when photo changes
     useEffect(() => {
         setLoading(true)
     }, [currentIndex])
 
+    // Pre-cache surrounding images (+/- 5)
+    useEffect(() => {
+        if (!photos || photos.length === 0) return
+        const token = localStorage.getItem('access_token')
+
+        const preloadImage = (index) => {
+            if (index >= 0 && index < photos.length) {
+                const img = new Image()
+                const photo = photos[index]
+                img.src = `/api/v1/photos/${photo.photo_id}/download?token=${token}`
+            }
+        }
+
+        for (let i = 1; i <= 5; i++) {
+            preloadImage(currentIndex + i)
+            preloadImage(currentIndex - i)
+        }
+    }, [currentIndex, photos])
+
+    // Auto-hide controls logic
+    const resetControlsTimer = () => {
+        setShowControls(true)
+        if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current)
+        controlsTimeoutRef.current = setTimeout(() => {
+            setShowControls(false)
+        }, 5000)
+    }
+
+    useEffect(() => {
+        resetControlsTimer()
+        window.addEventListener('mousemove', resetControlsTimer)
+        return () => {
+            window.removeEventListener('mousemove', resetControlsTimer)
+            if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current)
+        }
+    }, [])
+
     useEffect(() => {
         const handleKeyDown = (e) => {
+            resetControlsTimer() // Show controls on interaction
             if (e.key === 'Escape') {
                 onClose()
             } else if (e.key === 'ArrowLeft' && currentIndex > 0) {
@@ -37,6 +79,7 @@ export default function Lightbox({ photo, photos, onClose, onNavigate }) {
     if (!photo || !photos || photos.length === 0) return null
 
     const currentPhoto = photos[currentIndex]
+    const token = localStorage.getItem('access_token')
 
     const formatDate = (dateString) => {
         return new Date(dateString).toLocaleDateString('en-US', {
@@ -56,14 +99,18 @@ export default function Lightbox({ photo, photos, onClose, onNavigate }) {
     }
 
     return (
-        <div className="lightbox-overlay" onClick={onClose}>
+        <div className="lightbox-overlay" onClick={onClose} onMouseMove={resetControlsTimer}>
             <div className="lightbox-content" onClick={(e) => e.stopPropagation()}>
-                <div className="lightbox-header">
+
+                {/* Header Overlay */}
+                <div className={`lightbox-header ${showControls ? 'visible' : ''}`}>
                     <div className="lightbox-title">
                         <h3>{currentPhoto.filename}</h3>
                         <p>{currentIndex + 1} of {photos.length}</p>
                     </div>
-                    <button className="lightbox-close" onClick={onClose}>×</button>
+                    <button className="lightbox-close-btn" onClick={onClose}>
+                        <X size={24} />
+                    </button>
                 </div>
 
                 <div className="lightbox-image-container">
@@ -74,38 +121,47 @@ export default function Lightbox({ photo, photos, onClose, onNavigate }) {
                     )}
 
                     {currentIndex > 0 && (
-                        <button className="lightbox-nav lightbox-prev" onClick={() => onNavigate(photos[currentIndex - 1])}>
-                            ←
+                        <button
+                            className={`lightbox-nav lightbox-prev ${showControls ? 'visible' : ''}`}
+                            onClick={(e) => { e.stopPropagation(); onNavigate(photos[currentIndex - 1]) }}
+                        >
+                            <ChevronLeft size={40} />
                         </button>
                     )}
 
                     <img
-                        src={`/api/v1/photos/${currentPhoto.photo_id}/download?token=${localStorage.getItem('access_token')}`}
+                        key={currentPhoto.photo_id}
+                        src={`/api/v1/photos/${currentPhoto.photo_id}/download?token=${token}`}
                         alt={currentPhoto.filename}
-                        className={`lightbox-image ${loading ? 'hidden' : ''}`}
+                        className={`lightbox-image ${loading ? 'loading' : 'loaded'}`}
                         onLoad={() => setLoading(false)}
                     />
 
                     {currentIndex < photos.length - 1 && (
-                        <button className="lightbox-nav lightbox-next" onClick={() => onNavigate(photos[currentIndex + 1])}>
-                            →
+                        <button
+                            className={`lightbox-nav lightbox-next ${showControls ? 'visible' : ''}`}
+                            onClick={(e) => { e.stopPropagation(); onNavigate(photos[currentIndex + 1]) }}
+                        >
+                            <ChevronRight size={40} />
                         </button>
                     )}
                 </div>
 
-                <div className="lightbox-footer">
+                {/* Footer Metadata Overlay */}
+                <div className={`lightbox-footer ${showControls ? 'visible' : ''}`}>
                     <div className="lightbox-metadata">
-                        <span>📅 {formatDate(currentPhoto.uploaded_at)}</span>
-                        <span>📏 {formatSize(currentPhoto.size_bytes)}</span>
-                        <span>📄 {currentPhoto.mime_type}</span>
+                        <span><Calendar size={14} /> {formatDate(currentPhoto.uploaded_at)}</span>
+                        <span><HardDrive size={14} /> {formatSize(currentPhoto.size_bytes)}</span>
+                        <span><FileType size={14} /> {currentPhoto.mime_type}</span>
                     </div>
                     <div className="lightbox-actions">
                         <a
-                            href={`/api/v1/photos/${currentPhoto.photo_id}/download?token=${localStorage.getItem('access_token')}`}
+                            href={`/api/v1/photos/${currentPhoto.photo_id}/download?token=${token}`}
                             download={currentPhoto.filename}
-                            className="lightbox-btn"
+                            className="lightbox-action-btn"
+                            title="Download"
                         >
-                            ⬇️ Download
+                            <Download size={20} />
                         </a>
                     </div>
                 </div>
