@@ -1,0 +1,46 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Copy files via SCP
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          source: "."
+          target: "/opt/photobomb"
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd /opt/photobomb
+            
+            # Create/Update .env file from secrets
+            echo "DATABASE_URL=postgresql+asyncpg://photobomb:${{ secrets.DB_PASSWORD }}@postgres:5432/photobomb" > backend/.env
+            echo "REDIS_URL=redis://redis:6379/0" >> backend/.env
+            echo "JWT_SECRET_KEY=${{ secrets.JWT_SECRET }}" >> backend/.env
+            echo "B2_APPLICATION_KEY_ID=${{ secrets.B2_KEY_ID }}" >> backend/.env
+            echo "B2_APPLICATION_KEY=${{ secrets.B2_KEY }}" >> backend/.env
+            echo "B2_BUCKET_NAME=photobomb-prod" >> backend/.env
+            echo "B2_BUCKET_ID=${{ secrets.B2_BUCKET_ID }}" >> backend/.env
+            
+            # Restart containers
+            docker compose down
+            docker compose up -d --build
+            
+            # Run migrations
+            docker compose exec -T api alembic upgrade head
