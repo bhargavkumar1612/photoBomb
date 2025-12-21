@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
+import { backgroundTransferManager } from '../services/BackgroundTransferManager'
 import api from '../services/api'
 import './Upload.css'
 
@@ -21,38 +22,16 @@ export default function Upload() {
 
         setUploading(true)
 
-        for (const file of selectedFiles) {
-            try {
-                // Upload directly through backend (bypasses CORS)
-                const formData = new FormData()
-                formData.append('file', file)
+        try {
+            await backgroundTransferManager.uploadFiles(selectedFiles)
 
-                const response = await api.post('/upload/direct', formData, {
-                    headers: {
-                        'Content-Type': 'multipart/form-data'
-                    },
-                    onUploadProgress: (progressEvent) => {
-                        const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total)
-                        setProgress((prev) => ({ ...prev, [file.name]: percentCompleted }))
-                    }
-                })
-
-                setProgress((prev) => ({ ...prev, [file.name]: 100 }))
-            } catch (error) {
-                console.error('Upload failed:', error)
-                const errorMessage = error.response?.data?.detail || error.message
-                alert(`Upload failed for ${file.name}: ${errorMessage}`)
-                setProgress((prev) => ({ ...prev, [file.name]: -1 }))
-            }
+            // Navigate back immediately - upload continues in background
+            setTimeout(() => navigate('/'), 500)
+        } catch (error) {
+            console.error('Upload initiation failed:', error)
+            alert('Failed to start background upload. Please try again.')
+            setUploading(false)
         }
-
-        setUploading(false)
-
-        // Invalidate photos cache to refresh timeline
-        queryClient.invalidateQueries({ queryKey: ['photos'] })
-
-        // Navigate back to timeline
-        setTimeout(() => navigate('/'), 500)
     }
 
     return (

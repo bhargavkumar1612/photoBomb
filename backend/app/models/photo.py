@@ -67,6 +67,7 @@ class Photo(Base):
         Index('idx_photos_user_taken', 'user_id', 'taken_at', postgresql_where="deleted_at IS NULL"),
         Index('idx_photos_user_uploaded', 'user_id', 'uploaded_at', postgresql_where="deleted_at IS NULL"),
         Index('idx_photos_favorite', 'user_id', 'uploaded_at', postgresql_where="favorite = true AND deleted_at IS NULL"),
+        Index('idx_photos_user_deleted', 'user_id', 'deleted_at', postgresql_where="deleted_at IS NOT NULL"),
         {'schema': 'photobomb'}
     )
     

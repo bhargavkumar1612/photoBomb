@@ -1,7 +1,7 @@
 """
 Album model for organizing photos into collections.
 """
-from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Table
+from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Table, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -14,7 +14,7 @@ album_photos = Table(
     'album_photos',
     Base.metadata,
     Column('album_id', UUID(as_uuid=True), ForeignKey('photobomb.albums.album_id', ondelete='CASCADE'), primary_key=True),
-    Column('photo_id', UUID(as_uuid=True), ForeignKey('photobomb.photos.photo_id', ondelete='CASCADE'), primary_key=True),
+    Column('photo_id', UUID(as_uuid=True), ForeignKey('photobomb.photos.photo_id', ondelete='CASCADE'), primary_key=True, index=True),
     Column('added_at', DateTime, default=datetime.utcnow),
     schema='photobomb'
 )
@@ -22,10 +22,13 @@ album_photos = Table(
 class Album(Base):
     """Album model for photo collections"""
     __tablename__ = "albums"
-    __table_args__ = {'schema': 'photobomb'}
-
     album_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey('photobomb.users.user_id', ondelete='CASCADE'), nullable=False, index=True)
+    
+    __table_args__ = (
+        Index('idx_albums_user_updated', 'user_id', 'updated_at'),
+        {'schema': 'photobomb'}
+    )
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     cover_photo_id = Column(UUID(as_uuid=True), ForeignKey('photobomb.photos.photo_id', ondelete='SET NULL'), nullable=True)

@@ -41,5 +41,4 @@ dist-ssr
 
 # PWA
 dev-dist
-sw.js
 workbox-*.js

@@ -20,6 +20,8 @@ from app.core.security import (
     decode_token
 )
 from app.models.user import User
+from app.models.photo import Photo
+from sqlalchemy import func
 from app.core.config import settings
 
 router = APIRouter()
@@ -325,8 +327,28 @@ async def google_login(
 
 
 @router.get("/me")
-async def get_current_user_info(current_user: User = Depends(get_current_user)):
-    """Get current authenticated user information."""
+async def get_current_user_info(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get current authenticated user information and sync storage usage."""
+    
+    # Recalculate storage usage from DB to ensure accuracy
+    # This acts as a self-healing mechanism on login/refresh
+    result = await db.execute(
+        select(func.sum(Photo.size_bytes)).where(
+            Photo.user_id == current_user.user_id,
+            Photo.deleted_at == None
+        )
+    )
+    actual_storage_bytes = result.scalar() or 0
+    
+    if current_user.storage_used_bytes != actual_storage_bytes:
+        current_user.storage_used_bytes = actual_storage_bytes
+        db.add(current_user)
+        await db.commit()
+        await db.refresh(current_user)
+
     return {
         "user_id": str(current_user.user_id),
         "email": current_user.email,

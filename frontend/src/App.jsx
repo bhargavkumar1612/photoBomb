@@ -9,6 +9,7 @@ import Settings from './pages/Settings'
 import Albums from './pages/Albums'
 import AlbumDetail from './pages/AlbumDetail'
 import Sidebar from './components/Sidebar'
+import UploadProgressWidget from './components/UploadProgressWidget'
 import './App.css'
 
 // Protected Route wrapper
@@ -35,6 +36,7 @@ function AppLayout({ children }) {
                 </button>
                 {children}
             </div>
+            <UploadProgressWidget />
         </div>
     )
 }

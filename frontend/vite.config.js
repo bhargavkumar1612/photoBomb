@@ -6,57 +6,35 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.js',
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'robots.txt', 'icons/*.png'],
       manifest: {
-        name: 'PhotoBomb - Your Photo Library',
+        name: 'PhotoBomb',
         short_name: 'PhotoBomb',
-        description: 'Privacy-first photo storage and sharing',
+        description: 'Privacy-first photo storage',
         theme_color: '#4F46E5',
-        background_color: '#FFFFFF',
+        start_url: '/',
         display: 'standalone',
-        orientation: 'portrait',
+        background_color: '#ffffff',
         icons: [
           {
             src: '/icons/icon-192x192.png',
             sizes: '192x192',
-            type: 'image/png',
-            purpose: 'any maskable'
+            type: 'image/png'
           },
           {
             src: '/icons/icon-512x512.png',
             sizes: '512x512',
-            type: 'image/png',
-            purpose: 'any maskable'
+            type: 'image/png'
           }
         ]
       },
-      workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,webp}'],
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/api\.photobomb\.app\/api\/v1\/photos/,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-cache',
-              expiration: {
-                maxEntries: 200,
-                maxAgeSeconds: 5 * 60 // 5 minutes
-              }
-            }
-          },
-          {
-            urlPattern: /\/thumb\//,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'thumbnails',
-              expiration: {
-                maxEntries: 500,
-                maxAgeSeconds: 7 * 24 * 60 * 60 // 7 days
-              }
-            }
-          }
-        ]
+      devOptions: {
+        enabled: true,
+        type: 'module'
       }
     })
   ],
