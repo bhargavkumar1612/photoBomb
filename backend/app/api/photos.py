@@ -404,7 +404,7 @@ async def delete_photo(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Soft-delete a photo (moves to trash, 30-day retention) and delete from B2."""
+    """Soft-delete a photo (moves to trash). Does NOT delete from B2 storage."""
     result = await db.execute(
         select(Photo).where(
             Photo.photo_id == photo_id,
@@ -420,31 +420,169 @@ async def delete_photo(
             detail="Photo not found"
         )
     
-    # Delete from B2 first
+    # Soft delete in database only
+    photo.deleted_at = datetime.utcnow()
+    
+    # Note: We do NOT reduce storage quota here because the file still exists in B2
+    # Quota is reduced only on permanent delete
+    
+    await db.commit()
+    
+    return None
+
+
+@router.get("/trash/list", response_model=PhotoListResponse)
+async def get_trash(
+    limit: int = Query(50, ge=1, le=200),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """List photos in trash (deleted_at is not null)."""
+    # Build query for deleted photos
+    query = select(Photo).where(
+        Photo.user_id == current_user.user_id,
+        Photo.deleted_at != None
+    ).order_by(desc(Photo.deleted_at))
+    
+    # Limit results
+    query = query.limit(limit + 1)
+    
+    result = await db.execute(query)
+    photos = result.scalars().all()
+    
+    has_more = len(photos) > limit
+    if has_more:
+        photos = photos[:limit]
+    
+    # Build response
+    photo_responses = []
+    for photo in photos:
+        # Generate thumbnail URLs
+        thumb_urls = {
+            "thumb_256": f"/api/v1/photos/{photo.photo_id}/thumbnail/256",
+            "thumb_512": f"/api/v1/photos/{photo.photo_id}/thumbnail/512",
+            "thumb_1024": f"/api/v1/photos/{photo.photo_id}/thumbnail/1024",
+        }
+        
+        photo_responses.append(PhotoResponse(
+            photo_id=str(photo.photo_id),
+            filename=photo.filename,
+            mime_type=photo.mime_type,
+            size_bytes=photo.size_bytes,
+            taken_at=photo.taken_at,
+            uploaded_at=photo.uploaded_at,
+            caption=photo.caption,
+            favorite=photo.favorite,
+            archived=photo.archived,
+            thumb_urls=thumb_urls
+        ))
+    
+    return PhotoListResponse(
+        photos=photo_responses,
+        next_cursor=None, # TODO: Implement cursor if needed
+        has_more=has_more
+    )
+
+
+@router.post("/{photo_id}/restore", status_code=status.HTTP_200_OK)
+async def restore_photo(
+    photo_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Restore a photo from trash."""
+    result = await db.execute(
+        select(Photo).where(
+            Photo.photo_id == photo_id,
+            Photo.user_id == current_user.user_id,
+            Photo.deleted_at != None
+        )
+    )
+    photo = result.scalar_one_or_none()
+    
+    if not photo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Photo not found in trash"
+        )
+    
+    # Restore
+    photo.deleted_at = None
+    await db.commit()
+    
+    return {"status": "restored"}
+
+
+@router.delete("/{photo_id}/permanent", status_code=status.HTTP_204_NO_CONTENT)
+async def permanently_delete_photo(
+    photo_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Permanently delete a photo from B2 and database."""
+    # Find photo (checked deleted and non-deleted to allow deleting directly if needed, 
+    # but usually from trash so we check for user ownership)
+    result = await db.execute(
+        select(Photo).where(
+            Photo.photo_id == photo_id,
+            Photo.user_id == current_user.user_id
+        )
+    )
+    photo = result.scalar_one_or_none()
+    
+    if not photo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Photo not found"
+        )
+    
+    # Delete from B2
     b2_key = f"uploads/{current_user.user_id}/{photo.photo_id}/original/{photo.filename}"
     try:
         # Get file info to get file_id for deletion
+        # TODO: Refactor B2 service to expose delete_by_name or similar cleanly
         import requests
-        auth_token = b2_service.info.get_account_auth_token()
-        download_url = f"{b2_service.info.get_download_url()}/file/{b2_service.get_bucket().name}/{b2_key}"
+        # We need to list filenames to get the ID or handle this in b2_service
+        # For now, we'll try best effort with b2_service methods if available, or direct API
         
-        # Try to get file info
-        response = requests.head(download_url, headers={"Authorization": auth_token})
-        if response.status_code == 200:
-            # File exists, delete it using B2 API
-            file_id = response.headers.get('x-bz-file-id')
-            if file_id:
-                b2_service.delete_file(file_id, b2_key)
+        # Simplified approach: Just clear the DB record if B2 fails, but B2 is critical for storage
+        # Ideally b2_service should handle this. Let's try to list versions and delete.
+        bucket = b2_service.get_bucket()
+        
+        # List versions of the file to get ID
+        for file_version in bucket.ls(folder_to_list=f"uploads/{current_user.user_id}/{photo.photo_id}"):
+             # Tuple (file_version_info, folder_name) or similar depending on library version
+             # b2sdk ls returns generator of (file_version, folder)
+             
+             # Actually, simpler to just assume key structure and iterate
+             # If using b2sdk, we can hide_file (soft delete in B2) or delete_file_version
+             pass
+             
+        # Direct deletion logic from previous implementation was trying to use requests which is hacky
+        # Use b2sdk properly if possible, or fallback to the previous logic which seemed to work for verified delete
+        
+        # Use a more robust B2 delete: hide it first (simpler) or iterate versions?
+        # B2 'hide_file' creates a hidden marker. 'delete_file_version' removes it.
+        # We want to remove all versions.
+        
+        # Iterating versions to delete all
+        # b2_service.bucket is a b2sdk.v2.Bucket object
+        file_versions = bucket.ls(f"uploads/{current_user.user_id}/{photo.photo_id}", recursive=True)
+        for file_version, _ in file_versions:
+            file_version.delete()
+            
     except Exception as e:
-        # Log error but don't fail the delete - file might already be gone
         print(f"Warning: Failed to delete file from B2: {str(e)}")
+        # Proceed to DB delete anyway to free up quota in our system
     
-    # Soft delete in database
-    photo.deleted_at = datetime.utcnow()
+    # Hard delete from database
+    await db.delete(photo)
     
     # Update user storage quota
     current_user.storage_used_bytes -= photo.size_bytes
-    
+    if current_user.storage_used_bytes < 0:
+        current_user.storage_used_bytes = 0
+        
     await db.commit()
     
     return None

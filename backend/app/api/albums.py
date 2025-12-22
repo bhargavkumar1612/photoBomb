@@ -266,6 +266,95 @@ async def delete_album(
     await db.commit()
 
 
+@router.post("/{album_id}/photos", status_code=status.HTTP_201_CREATED)
+async def add_photos_to_album(
+    album_id: str,
+    photo_ids: List[str],
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Add multiple photos to an album."""
+    # Verify album exists and belongs to user
+    result = await db.execute(
+        select(Album).where(
+            Album.album_id == album_id,
+            Album.user_id == current_user.user_id
+        )
+    )
+    album = result.scalar_one_or_none()
+    if not album:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Album not found"
+        )
+
+    # Verify photos exist and belong to user
+    # Simplified check: just fetch them
+    photos_result = await db.execute(
+        select(Photo.photo_id).where(
+            Photo.photo_id.in_(photo_ids),
+            Photo.user_id == current_user.user_id
+        )
+    )
+    valid_photo_ids = photos_result.scalars().all()
+    
+    if not valid_photo_ids:
+        raise HTTPException(status_code=400, detail="No valid photos found")
+
+    # Insert into junction table
+    # We should use ON CONFLICT DO NOTHING or checks to avoid duplicates
+    # For simplicity, we check existence first or catch integrity errors?
+    # Better: explicit check.
+    
+    # Get existing associations
+    existing_result = await db.execute(
+        select(album_photos.c.photo_id).where(
+            album_photos.c.album_id == album_id,
+            album_photos.c.photo_id.in_(valid_photo_ids)
+        )
+    )
+    existing_ids = set(str(pid) for pid in existing_result.scalars().all())
+    
+    # Filter out already added
+    new_ids = [pid for pid in valid_photo_ids if str(pid) not in existing_ids]
+    
+    if new_ids:
+        values = [{"album_id": album_id, "photo_id": pid, "added_at": datetime.utcnow()} for pid in new_ids]
+        await db.execute(album_photos.insert(), values)
+        
+        # Update album updated_at
+        album.updated_at = datetime.utcnow()
+        await db.commit()
+        
+    return {"added_count": len(new_ids), "existing_count": len(existing_ids)}
+
+
+@router.delete("/{album_id}/photos/{photo_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_photo_from_album(
+    album_id: str,
+    photo_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Remove a photo from an album."""
+    # Verify album ownership
+    result = await db.execute(
+        select(Album).where(Album.album_id == album_id, Album.user_id == current_user.user_id)
+    )
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Album not found")
+        
+    # Delete from junction table
+    await db.execute(
+        delete(album_photos).where(
+            album_photos.c.album_id == album_id,
+            album_photos.c.photo_id == photo_id
+        )
+    )
+    await db.commit()
+
+
+
 # Add photo to album
 @router.post("/{album_id}/photos/{photo_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def add_photo_to_album(

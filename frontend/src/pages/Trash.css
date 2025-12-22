@@ -1,0 +1,139 @@
+.trash-header {
+    padding: 32px 40px;
+    background: white;
+    border-bottom: 1px solid #e5e7eb;
+    margin-bottom: 20px;
+}
+
+.trash-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.trash-title h1 {
+    font-size: 32px;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0;
+}
+
+.trash-badge {
+    background: #e5e7eb;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #4b5563;
+}
+
+.trash-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #6b7280;
+    font-size: 14px;
+}
+
+.trash-card .photo-wrapper {
+    position: relative;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.trash-card img {
+    width: 100%;
+    display: block;
+    border-radius: 4px;
+    /* Grayscale to indicate deleted state */
+    filter: grayscale(30%);
+    transition: filter 0.2s;
+}
+
+.trash-card:hover img {
+    filter: grayscale(0%);
+}
+
+.trash-actions {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 12px;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent);
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.trash-card:hover .trash-actions {
+    opacity: 1;
+}
+
+.btn-trash-action {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.2s, background 0.2s;
+    color: white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.btn-trash-action:hover {
+    transform: scale(1.1);
+}
+
+.btn-trash-action.restore {
+    background: #10b981;
+    /* Green */
+}
+
+.btn-trash-action.restore:hover {
+    background: #059669;
+}
+
+.btn-trash-action.delete-forever {
+    background: #ef4444;
+    /* Red */
+}
+
+.btn-trash-action.delete-forever:hover {
+    background: #dc2626;
+}
+
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
+
+/* Reuse spinner from somewhere or simple css */
+.spinner {
+    width: 20px;
+    height: 20px;
+    border: 3px solid #e5e7eb;
+    border-top-color: #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}

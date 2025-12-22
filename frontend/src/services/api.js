@@ -42,11 +42,18 @@ api.interceptors.response.use(
                 originalRequest.headers.Authorization = `Bearer ${access_token}`
                 return api(originalRequest)
             } catch (refreshError) {
-                // Refresh failed, logout user
-                localStorage.removeItem('access_token')
                 localStorage.removeItem('refresh_token')
                 window.location.href = '/login'
                 return Promise.reject(refreshError)
+            }
+        }
+
+        // Global 401 handler: If we get here and it's 401 (e.g. retry failed or no refresh token), force logout
+        if (error.response?.status === 401) {
+            localStorage.removeItem('access_token')
+            localStorage.removeItem('refresh_token')
+            if (window.location.pathname !== '/login') {
+                window.location.href = '/login'
             }
         }
 

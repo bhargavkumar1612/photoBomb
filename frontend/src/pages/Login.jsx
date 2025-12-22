@@ -10,7 +10,7 @@ export default function Login() {
     const [password, setPassword] = useState('')
     const [error, setError] = useState('')
     const [loading, setLoading] = useState(false)
-    const { login } = useAuth()
+    const { login, setUser } = useAuth()
     const navigate = useNavigate()
 
     const handleSubmit = async (e) => {
@@ -42,9 +42,9 @@ export default function Login() {
             localStorage.setItem('access_token', access_token)
             localStorage.setItem('refresh_token', refresh_token)
 
-            // Navigate to home
+            // Update context and navigate
+            setUser(user)
             navigate('/')
-            window.location.reload() // Reload to update auth context
         } catch (err) {
             setError(err.response?.data?.detail || 'Google sign-in failed. Please try again.')
             setLoading(false)

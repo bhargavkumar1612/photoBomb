@@ -8,6 +8,7 @@ import Upload from './pages/Upload'
 import Settings from './pages/Settings'
 import Albums from './pages/Albums'
 import AlbumDetail from './pages/AlbumDetail'
+import Trash from './pages/Trash'
 import Sidebar from './components/Sidebar'
 import UploadProgressWidget from './components/UploadProgressWidget'
 import './App.css'
@@ -55,16 +56,7 @@ function Favorites() {
     )
 }
 
-function Trash() {
-    return (
-        <div className="timeline-container">
-            <header className="timeline-header">
-                <h1>Trash</h1>
-                <p>Recently deleted items (Coming soon...)</p>
-            </header>
-        </div>
-    )
-}
+// function Trash() { ... } removed to use imported component
 
 function App() {
     return (

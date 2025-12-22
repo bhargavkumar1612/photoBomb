@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import { Home, Folder, Star, Trash2, Settings, Cloud } from 'lucide-react'
 import api from '../services/api'
 import './Sidebar.css'
 
@@ -16,11 +17,11 @@ export default function Sidebar({ isOpen, onClose }) {
     })
 
     const menuItems = [
-        { path: '/', icon: '🏠', label: 'Photos' },
-        { path: '/albums', icon: '📁', label: 'Albums' },
-        { path: '/favorites', icon: '⭐', label: 'Favorites' },
-        { path: '/trash', icon: '🗑️', label: 'Trash' },
-        { path: '/settings', icon: '⚙️', label: 'Settings' },
+        { path: '/', icon: <Home size={20} />, label: 'Photos' },
+        { path: '/albums', icon: <Folder size={20} />, label: 'Albums' },
+        { path: '/favorites', icon: <Star size={20} />, label: 'Favorites' },
+        { path: '/trash', icon: <Trash2 size={20} />, label: 'Trash' },
+        { path: '/settings', icon: <Settings size={20} />, label: 'Settings' },
     ]
 
     const formatBytes = (bytes) => {

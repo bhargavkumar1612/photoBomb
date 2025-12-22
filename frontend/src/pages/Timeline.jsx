@@ -4,6 +4,7 @@ import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 import Masonry from 'react-masonry-css'
 import Lightbox from '../components/Lightbox'
 import SearchBar from '../components/SearchBar'
+import AddToAlbumModal from '../components/AddToAlbumModal'
 import PhotoCardSkeleton from '../components/skeletons/PhotoCardSkeleton'
 import PhotoItem from '../components/PhotoItem'
 import api from '../services/api'
@@ -28,31 +29,13 @@ export default function Timeline({ favoritesOnly = false }) {
         dateTo: ''
     })
     const [showAlbumModal, setShowAlbumModal] = useState(false)
-    const [photoToAddToAlbum, setPhotoToAddToAlbum] = useState(null)
+    const [batchAlbumPhotoIds, setBatchAlbumPhotoIds] = useState([]) // For modal (single or batch)
 
     const { data, isLoading, error } = useQuery({
         queryKey: ['photos'],
         queryFn: async () => {
             const response = await api.get('/photos')
             return response.data
-        }
-    })
-
-    const { data: albums } = useQuery({
-        queryKey: ['albums'],
-        queryFn: async () => {
-            const response = await api.get('/albums')
-            return response.data
-        }
-    })
-
-    const addToAlbumMutation = useMutation({
-        mutationFn: async ({ albumId, photoId }) => {
-            await api.post(`/albums/${albumId}/photos/${photoId}`)
-        },
-        onSuccess: () => {
-            setShowAlbumModal(false)
-            setPhotoToAddToAlbum(null)
         }
     })
 
@@ -92,7 +75,7 @@ export default function Timeline({ favoritesOnly = false }) {
     }
 
     const handleBulkDelete = async () => {
-        if (!window.confirm(`Delete ${selectedPhotos.size} photos?`)) return
+        if (!window.confirm(`Delete ${selectedPhotos.size} photos? This cannot be undone.`)) return
 
         for (const photoId of selectedPhotos) {
             try {
@@ -104,20 +87,14 @@ export default function Timeline({ favoritesOnly = false }) {
         setSelectionMode(false)
     }
 
-    const handleBulkFavorite = async () => {
-        for (const photoId of selectedPhotos) {
-            try {
-                await favoriteMutation.mutateAsync(photoId)
-            } catch (e) { console.error(e) }
-        }
-        setSelectedPhotos(new Set())
-        setSelectionMode(false)
-    }
-
     const toggleSelection = (photoId) => {
+        if (!selectionMode) setSelectionMode(true) // Auto-enable mode on first select logic if desired, but we have a toggle btn
+
         const newSelection = new Set(selectedPhotos)
         newSelection.has(photoId) ? newSelection.delete(photoId) : newSelection.add(photoId)
         setSelectedPhotos(newSelection)
+
+        // If unselecting last item, keep mode on? Or turn off? User preference. keeping on.
     }
 
     const handleDownload = async (photo) => {
@@ -144,18 +121,22 @@ export default function Timeline({ favoritesOnly = false }) {
         alert(`File: ${photo.filename}\nSize: ${(photo.size_bytes / 1024 / 1024).toFixed(2)} MB\nType: ${photo.mime_type}\nUploaded: ${new Date(photo.uploaded_at).toLocaleString()}`)
     }
 
+    // Add SINGLE photo to album (from card button)
     const handleAddToAlbum = (photo) => {
-        setPhotoToAddToAlbum(photo)
+        setBatchAlbumPhotoIds([photo.photo_id])
         setShowAlbumModal(true)
     }
 
-    const handleAlbumSelect = (albumId) => {
-        if (photoToAddToAlbum) {
-            addToAlbumMutation.mutate({
-                albumId,
-                photoId: photoToAddToAlbum.photo_id
-            })
-        }
+    // Add BATCH photos to album (from selection)
+    const handleBulkAddToAlbum = () => {
+        setBatchAlbumPhotoIds(Array.from(selectedPhotos))
+        setShowAlbumModal(true)
+    }
+
+    // Clear selection
+    const cancelSelection = () => {
+        setSelectedPhotos(new Set())
+        setSelectionMode(false)
     }
 
     const breakpointColumns = {
@@ -218,7 +199,6 @@ export default function Timeline({ favoritesOnly = false }) {
         return sorted
     }, [data?.photos, showFavoritesOnly, searchTerm, filters])
 
-    if (isLoading) return <div className="loading">Loading photos...</div>
     if (error) return <div className="error">Error: {error.message}</div>
 
     return (
@@ -233,9 +213,33 @@ export default function Timeline({ favoritesOnly = false }) {
                 <div className="toolbar-left">
                     <h1>{showFavoritesOnly ? 'Favorites' : 'Photos'}</h1>
                     <Link to="/upload" className="btn-upload">+ Upload</Link>
-                    <button onClick={handleCleanup} disabled={cleaning} style={{ fontSize: '13px' }}>
-                        {cleaning ? 'Cleaning...' : '🧹 Clean Up'}
+                    <button
+                        className={`btn-select ${selectionMode ? 'active' : ''}`}
+                        onClick={() => {
+                            if (selectionMode) cancelSelection();
+                            else setSelectionMode(true);
+                        }}
+                    >
+                        {selectionMode ? 'Cancel Select' : 'Select'}
                     </button>
+
+                    {selectionMode && selectedPhotos.size > 0 && (
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                            <button className="btn-select active" onClick={handleBulkAddToAlbum} style={{ fontWeight: '600' }}>
+                                + Add to Album
+                            </button>
+                            <button className="btn-select danger" onClick={handleBulkDelete}>
+                                🗑️ Delete ({selectedPhotos.size})
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Only show cleanup if not selecting */}
+                    {!selectionMode && (
+                        <button onClick={handleCleanup} disabled={cleaning} className="btn-cleanup">
+                            {cleaning ? 'Cleaning...' : '🧹'}
+                        </button>
+                    )}
                 </div>
 
                 <div className="toolbar-right">
@@ -246,23 +250,8 @@ export default function Timeline({ favoritesOnly = false }) {
                     </div>
 
                     <button className={showFavoritesOnly ? 'active' : ''} onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}>
-                        ⭐ {showFavoritesOnly ? 'All' : 'Favorites'}
+                        ⭐ {showFavoritesOnly ? 'All' : 'Facorites'}
                     </button>
-
-                    {!selectionMode ? (
-                        <button onClick={() => setSelectionMode(true)}>Select</button>
-                    ) : (
-                        <>
-                            <button onClick={() => setSelectedPhotos(new Set(filteredPhotos.map(p => p.photo_id)))}>Select All</button>
-                            {selectedPhotos.size > 0 && (
-                                <>
-                                    <button onClick={handleBulkFavorite}>⭐ ({selectedPhotos.size})</button>
-                                    <button onClick={handleBulkDelete} className="danger">🗑️ ({selectedPhotos.size})</button>
-                                </>
-                            )}
-                            <button onClick={() => { setSelectionMode(false); setSelectedPhotos(new Set()) }}>Cancel</button>
-                        </>
-                    )}
                 </div>
             </div>
 
@@ -277,25 +266,25 @@ export default function Timeline({ favoritesOnly = false }) {
                             <PhotoCardSkeleton key={i} />
                         ))}
                     </Masonry>
-                ) : !filteredPhotos?.length ? (
+                ) : filteredPhotos.length === 0 ? (
                     <div className="empty-state">
-                        <h2>{showFavoritesOnly ? 'No favorites' : 'No photos yet'}</h2>
-                        <Link to="/upload" className="btn-primary">Upload Now</Link>
+                        <h3>No photos found</h3>
+                        <p>Try adjusting your search or filters</p>
                     </div>
                 ) : (
                     <Masonry
                         breakpointCols={breakpointColumns}
-                        className="masonry-grid"
-                        columnClassName="masonry-column"
+                        className="my-masonry-grid"
+                        columnClassName="my-masonry-grid_column"
                     >
-                        {filteredPhotos.map((photo) => (
+                        {filteredPhotos.map(photo => (
                             <PhotoItem
                                 key={photo.photo_id}
                                 photo={photo}
                                 selectionMode={selectionMode}
                                 isSelected={selectedPhotos.has(photo.photo_id)}
                                 onToggleSelection={toggleSelection}
-                                onLightbox={(p) => setLightboxPhoto(p)}
+                                onLightbox={setLightboxPhoto}
                                 onFavorite={(id) => favoriteMutation.mutate(id)}
                                 isDeleting={deletingPhoto === photo.photo_id}
                                 onDelete={handleDelete}
@@ -319,49 +308,11 @@ export default function Timeline({ favoritesOnly = false }) {
             )}
 
             {/* Album Selection Modal */}
-            {showAlbumModal && (
-                <div className="modal-overlay" onClick={() => setShowAlbumModal(false)}>
-                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h2>Add to Album</h2>
-                            <button className="modal-close" onClick={() => setShowAlbumModal(false)}>×</button>
-                        </div>
-                        <div className="modal-body">
-                            {!albums || albums.length === 0 ? (
-                                <div className="empty-picker">
-                                    <p>No albums found.</p>
-                                    <Link to="/albums" className="btn-link">Create an album first</Link>
-                                </div>
-                            ) : (
-                                <div className="album-picker-list">
-                                    {albums.map(album => (
-                                        <button
-                                            key={album.album_id}
-                                            className="album-picker-item"
-                                            onClick={() => handleAlbumSelect(album.album_id)}
-                                        >
-                                            <div className="album-picker-cover">
-                                                {album.cover_photo_id ? (
-                                                    <img
-                                                        src={`/api/v1/photos/${album.cover_photo_id}/thumbnail/200?token=${localStorage.getItem('access_token')}`}
-                                                        alt={album.name}
-                                                    />
-                                                ) : (
-                                                    <div className="album-picker-placeholder">📁</div>
-                                                )}
-                                            </div>
-                                            <div className="album-picker-info">
-                                                <span className="album-picker-name">{album.name}</span>
-                                                <span className="album-picker-count">{album.photo_count} photos</span>
-                                            </div>
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
+            <AddToAlbumModal
+                isOpen={showAlbumModal}
+                onClose={() => setShowAlbumModal(false)}
+                photoIds={batchAlbumPhotoIds}
+            />
         </div>
     )
 }

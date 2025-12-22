@@ -97,10 +97,50 @@ body {
 
 .grid-size-selector,
 .filter-buttons,
-.selection-controls {
-    display: flex;
-    gap: 8px;
-    align-items: center;
+
+.btn-select {
+    padding: 8px 16px;
+    background: white;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    color: #4b5563;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-select.active {
+    background: #e0e7ff;
+    border-color: #6366f1;
+    color: #4f46e5;
+}
+
+.btn-select.danger {
+    color: #dc2626;
+    border-color: #fecaca;
+}
+
+.btn-select.danger:hover {
+    background: #fef2f2;
+    border-color: #dc2626;
+}
+
+.btn-cleanup {
+    background: none;
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 6px;
+}
+
+.btn-cleanup:hover {
+    background: #f3f4f6;
+}
+
+display: flex;
+gap: 8px;
+align-items: center;
 }
 
 .grid-size-selector button,
@@ -204,7 +244,7 @@ body {
 /* Photo Card */
 .photo-card {
     position: relative;
-    border-radius: 12px;
+    border-radius: 4px;
     overflow: hidden;
     background: white;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -454,19 +494,19 @@ body {
 }
 
 /* Masonry Grid */
-.masonry-grid {
+.my-masonry-grid {
     display: flex;
-    margin-left: -20px;
+    margin-left: -2px;
     width: auto;
 }
 
-.masonry-column {
-    padding-left: 20px;
+.my-masonry-grid_column {
+    padding-left: 2px;
     background-clip: padding-box;
 }
 
-.masonry-column>.photo-card {
-    margin-bottom: 20px;
+.my-masonry-grid_column>.photo-card {
+    margin-bottom: 2px;
 }
 
 /* Timeline Wrapper */

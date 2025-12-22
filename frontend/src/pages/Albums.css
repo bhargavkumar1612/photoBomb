@@ -175,22 +175,28 @@
 }
 
 .btn-delete-album {
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(255, 255, 255, 0.9);
     border: none;
-    color: white;
-    width: 36px;
-    height: 36px;
+    color: #ef4444;
+    width: 32px;
+    height: 32px;
     border-radius: 50%;
-    cursor: pointer;
-    font-size: 18px;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background 0.2s;
+    cursor: pointer;
+    transition: all 0.2s;
+    opacity: 0;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.album-card:hover .btn-delete-album {
+    opacity: 1;
 }
 
 .btn-delete-album:hover {
-    background: rgba(220, 38, 38, 0.9);
+    background: #fee2e2;
+    transform: scale(1.1);
 }
 
 /* Empty State */

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
+import { Trash2 } from 'lucide-react'
 import AlbumCardSkeleton from '../components/skeletons/AlbumCardSkeleton'
 import api from '../services/api'
 import './Albums.css'
@@ -136,11 +137,12 @@ export default function Albums() {
                                 <button
                                     className="btn-delete-album"
                                     onClick={(e) => {
-                                        e.stopPropagation()
+                                        e.preventDefault() // Prevent navigation
                                         handleDeleteAlbum(album.album_id, album.name)
                                     }}
+                                    title="Delete Album"
                                 >
-                                    🗑️
+                                    <Trash2 size={16} />
                                 </button>
                             </div>
                         </div>
