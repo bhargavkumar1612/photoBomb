@@ -2,13 +2,14 @@
 Authentication API endpoints.
 Implements register, login, and JWT refresh.
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Header
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request, Query, Header
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 import hashlib
+import uuid
 from jose import jwt, JWTError
 
 from app.core.database import get_db
@@ -333,22 +334,6 @@ async def get_current_user_info(
 ):
     """Get current authenticated user information and sync storage usage."""
     
-    # Recalculate storage usage from DB to ensure accuracy
-    # This acts as a self-healing mechanism on login/refresh
-    result = await db.execute(
-        select(func.sum(Photo.size_bytes)).where(
-            Photo.user_id == current_user.user_id,
-            Photo.deleted_at == None
-        )
-    )
-    actual_storage_bytes = result.scalar() or 0
-    
-    if current_user.storage_used_bytes != actual_storage_bytes:
-        current_user.storage_used_bytes = actual_storage_bytes
-        db.add(current_user)
-        await db.commit()
-        await db.refresh(current_user)
-
     return {
         "user_id": str(current_user.user_id),
         "email": current_user.email,
@@ -357,6 +342,34 @@ async def get_current_user_info(
         "storage_used_bytes": current_user.storage_used_bytes,
         "storage_quota_bytes": current_user.storage_quota_bytes
     }
+
+async def get_current_user_id(
+    token: Optional[str] = Query(None),
+    authorization: Optional[str] = Header(None)
+) -> uuid.UUID:
+    """
+    Get user_id from token WITHOUT DB lookup.
+    Checks query param 'token' first, then Authorization header.
+    """
+    token_str = token
+    if not token_str and authorization:
+         if authorization.startswith("Bearer "):
+             token_str = authorization.split(" ")[1]
+         else:
+             token_str = authorization
+             
+    if not token_str:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+        
+    payload = decode_token(token_str)
+    if not payload or not payload.get("sub"):
+        raise HTTPException(status_code=401, detail="Invalid token")
+        
+    try:
+        return uuid.UUID(payload.get("sub"))
+    except ValueError:
+         raise HTTPException(status_code=401, detail="Invalid token subject")
+
 
 async def get_current_user_or_token(
     token: Optional[str] = Query(None),
@@ -420,24 +433,4 @@ async def get_current_user_or_token(
     return user
 
 
-@router.get("/me")
-async def get_current_user_info(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
-    """Get current authenticated user's information."""
-    # Refresh user data from DB to get latest storage info
-    result = await db.execute(
-        select(User).where(User.user_id == current_user.user_id)
-    )
-    user = result.scalar_one()
-    
-    return {
-        "user_id": str(user.user_id),
-        "email": user.email,
-        "full_name": user.full_name,
-        "face_enabled": user.face_enabled,
-        "storage_used_bytes": user.storage_used_bytes,
-        "storage_quota_bytes": user.storage_quota_bytes,
-        "created_at": user.created_at.isoformat() if user.created_at else None
-    }
+

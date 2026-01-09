@@ -38,7 +38,7 @@ export default function PhotoItem({
                 )}
 
                 <img
-                    src={`/api/v1/photos/${photo.photo_id}/thumbnail/512?token=${token}`}
+                    src={photo.thumb_urls.thumb_512}
                     alt={photo.filename}
                     loading="lazy"
                     onClick={() => !selectionMode && onLightbox(photo)}
@@ -49,7 +49,10 @@ export default function PhotoItem({
                     }}
                     onLoad={() => setImageLoaded(true)}
                     onError={(e) => {
-                        e.target.src = `/api/v1/photos/${photo.photo_id}/download?token=${token}`
+                        // Fallback to original image if thumbnail fails
+                        if (photo.thumb_urls.original) {
+                            e.target.src = photo.thumb_urls.original
+                        }
                         setImageLoaded(true)
                     }}
                 />

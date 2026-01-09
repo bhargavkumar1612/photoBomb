@@ -32,7 +32,7 @@ export default function Lightbox({ photo, photos, onClose, onNavigate }) {
             if (index >= 0 && index < photos.length) {
                 const img = new Image()
                 const photo = photos[index]
-                img.src = `/api/v1/photos/${photo.photo_id}/download?token=${token}`
+                img.src = photo.thumb_urls.original || `/api/v1/photos/${photo.photo_id}/download`
             }
         }
 
@@ -79,7 +79,6 @@ export default function Lightbox({ photo, photos, onClose, onNavigate }) {
     if (!photo || !photos || photos.length === 0) return null
 
     const currentPhoto = photos[currentIndex]
-    const token = localStorage.getItem('access_token')
 
     const formatDate = (dateString) => {
         return new Date(dateString).toLocaleDateString('en-US', {
@@ -131,7 +130,7 @@ export default function Lightbox({ photo, photos, onClose, onNavigate }) {
 
                     <img
                         key={currentPhoto.photo_id}
-                        src={`/api/v1/photos/${currentPhoto.photo_id}/download?token=${token}`}
+                        src={currentPhoto.thumb_urls.original || `/api/v1/photos/${currentPhoto.photo_id}/download`}
                         alt={currentPhoto.filename}
                         className={`lightbox-image ${loading ? 'loading' : 'loaded'}`}
                         onLoad={() => setLoading(false)}
@@ -156,7 +155,7 @@ export default function Lightbox({ photo, photos, onClose, onNavigate }) {
                     </div>
                     <div className="lightbox-actions">
                         <a
-                            href={`/api/v1/photos/${currentPhoto.photo_id}/download?token=${token}`}
+                            href={currentPhoto.thumb_urls.original || `/api/v1/photos/${currentPhoto.photo_id}/download`}
                             download={currentPhoto.filename}
                             className="lightbox-action-btn"
                             title="Download"

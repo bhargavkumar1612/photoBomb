@@ -78,10 +78,12 @@ export default function AlbumDetail() {
     }
 
     const handleDownload = (photo) => {
-        const url = `/api/v1/photos/${photo.photo_id}/download?token=${localStorage.getItem('access_token')}`
+        // Use signed URL
+        const url = photo.thumb_urls.original || `/api/v1/photos/${photo.photo_id}/download`
         const link = document.createElement('a')
         link.href = url
         link.download = photo.filename
+        link.target = "_blank"
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)

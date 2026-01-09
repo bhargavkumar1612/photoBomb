@@ -107,7 +107,7 @@ export default function Trash() {
                         <div key={photo.photo_id} className="photo-card trash-card">
                             <div className="photo-wrapper">
                                 <img
-                                    src={`/api/v1/photos/${photo.photo_id}/thumbnail/512?token=${localStorage.getItem('access_token')}`}
+                                    src={photo.thumb_urls.thumb_512}
                                     alt={photo.filename}
                                     className="photo-img"
                                     loading="lazy"

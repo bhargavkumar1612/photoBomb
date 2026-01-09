@@ -34,6 +34,11 @@ class B2Service:
         """Get the configured B2 bucket."""
         self.authorize()
         return self.api.get_bucket_by_name(settings.B2_BUCKET_NAME)
+
+    def get_download_url_base(self) -> str:
+        """Get the base download URL (e.g., https://f002.backblazeb2.com)."""
+        self.authorize()
+        return self.info.get_download_url()
     
     def generate_presigned_upload_url(
         self,
@@ -79,6 +84,66 @@ class B2Service:
             "b2_key": b2_key,
             "expires_at": expires_at
         }
+    
+    def get_download_authorization(
+        self,
+        b2_key_prefix: str,
+        valid_duration: int = 86400  # Default 24 hours
+    ) -> str:
+        """
+        Get authorization token for downloading files with specific prefix.
+        Used for AOT signing of client-side URLs.
+        """
+        self.authorize()
+        bucket = self.get_bucket()
+        
+        # Get download authorization
+        import requests
+        
+        # Get account auth token
+        auth_token = self.info.get_account_auth_token()
+        api_url = self.info.get_api_url()
+        
+        # Get download auth token
+        response = requests.post(
+            f"{api_url}/b2api/v2/b2_get_download_authorization",
+            headers={"Authorization": auth_token},
+            json={
+                "bucketId": bucket.id_,
+                "fileNamePrefix": b2_key_prefix,
+                "validDurationInSeconds": valid_duration
+            }
+        )
+        response.raise_for_status()
+        auth_data = response.json()
+        return auth_data['authorizationToken']
+
+    def generate_presigned_download_url(
+        self,
+        b2_key: str,
+        expires_in: int = 3600
+    ) -> str:
+        """
+        Generate a presigned URL for downloading a file directly from B2.
+        """
+        self.authorize()
+        bucket = self.get_bucket()
+        
+        # Get download URL base
+        download_url = self.info.get_download_url()
+        
+        # Get token for this specific file
+        token = self.get_download_authorization(b2_key, expires_in)
+        
+        # Construct URL
+        # Format: {downloadUrl}/file/{bucketName}/{fileName}?Authorization={token}
+        from urllib.parse import quote
+        # encoded_key = quote(b2_key) # b2_key is already path safe usually, but let's trust caller or B2 conventions
+        # Actually b2sdk suggests raw key
+        
+        final_url = f"{download_url}/file/{bucket.name}/{b2_key}?Authorization={token}"
+        
+        return final_url
     
     def download_file_bytes(
         self,

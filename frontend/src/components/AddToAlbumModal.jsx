@@ -128,8 +128,8 @@ export default function AddToAlbumModal({ isOpen, onClose, photoIds = [] }) {
                                     onClick={() => handleSelectAlbum(album.album_id)}
                                 >
                                     <div className="album-icon">
-                                        {album.cover_photo_id ? (
-                                            <img src={`/api/v1/photos/${album.cover_photo_id}/thumbnail/200?token=${localStorage.getItem('access_token')}`} alt="" />
+                                        {album.cover_photo_url ? (
+                                            <img src={album.cover_photo_url} alt="" />
                                         ) : (
                                             <Folder size={24} />
                                         )}

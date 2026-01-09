@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { backgroundTransferManager } from '../services/BackgroundTransferManager'
@@ -14,8 +14,32 @@ export default function Upload() {
 
     const handleFileSelect = (e) => {
         const files = Array.from(e.target.files)
-        setSelectedFiles(files)
+        setSelectedFiles(prev => [...prev, ...files]) // Append files
     }
+
+    useEffect(() => {
+        const handlePaste = (e) => {
+            const items = e.clipboardData.items
+            const files = []
+
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.startsWith('image/')) {
+                    const file = items[i].getAsFile()
+                    // Rename pasted blobs to something useful if needed, or default
+                    // Clipboard files usually have name "image.png"
+                    if (file) files.push(file)
+                }
+            }
+
+            if (files.length > 0) {
+                e.preventDefault()
+                setSelectedFiles(prev => [...prev, ...files])
+            }
+        }
+
+        window.addEventListener('paste', handlePaste)
+        return () => window.removeEventListener('paste', handlePaste)
+    }, [])
 
     const handleUpload = async () => {
         if (selectedFiles.length === 0) return
@@ -56,7 +80,7 @@ export default function Upload() {
                     <label htmlFor="file-input" className="upload-label">
                         <div className="upload-icon">📸</div>
                         <p>Click to select photos</p>
-                        <small>or drag and drop</small>
+                        <small>drag & drop or paste from clipboard (Cmd+V)</small>
                     </label>
                 </div>
 

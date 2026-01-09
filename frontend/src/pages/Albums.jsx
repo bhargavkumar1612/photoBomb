@@ -91,32 +91,32 @@ export default function Albums() {
                         <div key={album.album_id} className="album-card">
                             <Link to={`/albums/${album.album_id}`} className="album-link">
                                 <div className="album-cover">
-                                    {album.thumbnail_ids && album.thumbnail_ids.length > 0 ? (
-                                        <div className={`album-collage count-${Math.min(album.thumbnail_ids.length, 3)}`}>
+                                    {album.thumbnail_urls && album.thumbnail_urls.length > 0 ? (
+                                        <div className={`album-collage count-${Math.min(album.thumbnail_urls.length, 3)}`}>
                                             <div className="collage-main">
                                                 <img
-                                                    src={`/api/v1/photos/${album.thumbnail_ids[0]}/thumbnail/512?token=${localStorage.getItem('access_token')}`}
+                                                    src={album.thumbnail_urls[0]}
                                                     alt={album.name}
                                                 />
                                             </div>
-                                            {album.thumbnail_ids.length > 1 && (
+                                            {album.thumbnail_urls.length > 1 && (
                                                 <div className="collage-side">
                                                     <img
-                                                        src={`/api/v1/photos/${album.thumbnail_ids[1]}/thumbnail/200?token=${localStorage.getItem('access_token')}`}
+                                                        src={album.thumbnail_urls[1]}
                                                         alt={album.name}
                                                     />
-                                                    {album.thumbnail_ids.length > 2 && (
+                                                    {album.thumbnail_urls.length > 2 && (
                                                         <img
-                                                            src={`/api/v1/photos/${album.thumbnail_ids[2]}/thumbnail/200?token=${localStorage.getItem('access_token')}`}
+                                                            src={album.thumbnail_urls[2]}
                                                             alt={album.name}
                                                         />
                                                     )}
                                                 </div>
                                             )}
                                         </div>
-                                    ) : album.cover_photo_id ? (
+                                    ) : album.cover_photo_url ? (
                                         <img
-                                            src={`/api/v1/photos/${album.cover_photo_id}/thumbnail/512?token=${localStorage.getItem('access_token')}`}
+                                            src={album.cover_photo_url}
                                             alt={album.name}
                                         />
                                     ) : (

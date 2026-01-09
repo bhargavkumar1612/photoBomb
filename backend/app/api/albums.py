@@ -13,6 +13,8 @@ from app.api.auth import get_current_user
 from app.models.user import User
 from app.models.album import Album, album_photos
 from app.models.photo import Photo
+from app.services.b2_service import b2_service
+from app.core.config import settings
 
 router = APIRouter()
 
@@ -35,7 +37,9 @@ class AlbumResponse(BaseModel):
     name: str
     description: Optional[str]
     cover_photo_id: Optional[str]
-    thumbnail_ids: List[str] = []
+    cover_photo_url: Optional[str] = None
+    thumbnail_ids: List[str] = [] # Deprecated but kept for compatibility if needed
+    thumbnail_urls: List[str] = []
     photo_count: int
     created_at: datetime
     updated_at: datetime
@@ -81,11 +85,22 @@ async def create_album(
     await db.commit()
     await db.refresh(new_album)
     
+    # Generate URL if cover photo exists
+    cover_url = None
+    if new_album.cover_photo_id:
+        user_prefix = f"uploads/{current_user.user_id}/"
+        auth_token = b2_service.get_download_authorization(user_prefix)
+        download_base = b2_service.get_download_url_base()
+        bucket_name = settings.B2_BUCKET_NAME
+        key = f"{user_prefix}{new_album.cover_photo_id}/thumbnails/thumb_512.jpg"
+        cover_url = f"{download_base}/file/{bucket_name}/{key}?Authorization={auth_token}"
+
     return AlbumResponse(
         album_id=str(new_album.album_id),
         name=new_album.name,
         description=new_album.description,
         cover_photo_id=str(new_album.cover_photo_id) if new_album.cover_photo_id else None,
+        cover_photo_url=cover_url,
         photo_count=0,
         created_at=new_album.created_at,
         updated_at=new_album.updated_at
@@ -99,32 +114,95 @@ async def list_albums(
     db: AsyncSession = Depends(get_db)
 ):
     """Get all albums for current user."""
+    from sqlalchemy import func, and_
+    
+    # 1. Fetch albums
     result = await db.execute(
         select(Album).where(Album.user_id == current_user.user_id)
         .order_by(Album.updated_at.desc())
     )
     albums = result.scalars().all()
     
-    # Get photo counts for each album
+    if not albums:
+        return []
+        
+    album_ids = [a.album_id for a in albums]
+    
+    # 2. Bulk fetch photo counts
+    count_stmt = (
+        select(album_photos.c.album_id, func.count(album_photos.c.photo_id))
+        .where(album_photos.c.album_id.in_(album_ids))
+        .group_by(album_photos.c.album_id)
+    )
+    count_result = await db.execute(count_stmt)
+    counts_map = {row[0]: row[1] for row in count_result.all()}
+    
+    # 3. Bulk fetch thumbnails using window function (Top 3 per album)
+    # Subquery to assign row numbers partition by album
+    subq = (
+        select(
+            album_photos.c.album_id, 
+            album_photos.c.photo_id,
+            func.row_number().over(
+                partition_by=album_photos.c.album_id,
+                order_by=album_photos.c.added_at.desc()
+            ).label("rn")
+        )
+        .where(album_photos.c.album_id.in_(album_ids))
+        .subquery()
+    )
+    
+    # Filter where row number <= 3
+    thumb_stmt = (
+        select(subq.c.album_id, subq.c.photo_id)
+        .where(subq.c.rn <= 3)
+    )
+    thumb_result = await db.execute(thumb_stmt)
+    
+    # Group thumbnails by album
+    thumbs_map = {aid: [] for aid in album_ids}
+    for row in thumb_result.all():
+        thumbs_map[row[0]].append(str(row[1]))
+    
+    # Generate B2 Token for Signing
+    user_prefix = f"uploads/{current_user.user_id}/"
+    auth_token = b2_service.get_download_authorization(user_prefix, valid_duration=86400)
+    download_base = b2_service.get_download_url_base()
+    bucket_name = settings.B2_BUCKET_NAME
+    
+    def sign_thumb(photo_id, size=512):
+         key = f"{user_prefix}{photo_id}/thumbnails/thumb_{size}.jpg"
+         return f"{download_base}/file/{bucket_name}/{key}?Authorization={auth_token}"
+
+    # 4. Assemble response
     album_responses = []
     for album in albums:
-        # Count photos in album and get recent photos for collage
-        photos_result = await db.execute(
-            select(album_photos.c.photo_id)
-            .where(album_photos.c.album_id == album.album_id)
-            .order_by(album_photos.c.added_at.desc())
-        )
-        all_photo_ids = photos_result.scalars().all()
-        photo_count = len(all_photo_ids)
-        thumbnail_ids = [str(pid) for pid in all_photo_ids[:3]] # Get first 3 photo IDs
+        # Cover photo
+        cover_url = None
+        if album.cover_photo_id:
+            cover_url = sign_thumb(album.cover_photo_id, 512)
+            
+        # Thumbnails list
+        # Map IDs to signed URLs. Use 256 for list thumbnails? 
+        # Existing Frontend used 512 then 200, 200.
+        # B2 supports 256. 
+        # Let's use 256 for the list to save bandwidth, or 512 if quality needed.
+        # Given the grid, 256 should be fine. But let's stick to 512 for now to match 'cover' quality or mix.
+        # Actually frontend `Albums.jsx` specifically requests `thumbnail/512` for [0] and `thumbnail/200` for [1],[2].
+        # I'll enable 512 for all in this list for simplicity.
+        
+        t_ids = thumbs_map.get(album.album_id, [])
+        t_urls = [sign_thumb(pid, 512) for pid in t_ids]
         
         album_responses.append(AlbumResponse(
             album_id=str(album.album_id),
             name=album.name,
             description=album.description,
             cover_photo_id=str(album.cover_photo_id) if album.cover_photo_id else None,
-            thumbnail_ids=thumbnail_ids,
-            photo_count=photo_count,
+            cover_photo_url=cover_url,
+            thumbnail_ids=t_ids,
+            thumbnail_urls=t_urls,
+            photo_count=counts_map.get(album.album_id, 0),
             created_at=album.created_at,
             updated_at=album.updated_at
         ))
@@ -163,17 +241,36 @@ async def get_album(
     )
     photos = photos_result.scalars().all()
     
-    photos_data = [
-        {
+    # Generate B2 Token
+    user_prefix = f"uploads/{current_user.user_id}/"
+    auth_token = b2_service.get_download_authorization(user_prefix, valid_duration=86400)
+    download_base = b2_service.get_download_url_base()
+    bucket_name = settings.B2_BUCKET_NAME
+    
+    def sign_b2_url(key: str) -> str:
+        return f"{download_base}/file/{bucket_name}/{key}?Authorization={auth_token}"
+
+    photos_data = []
+    for p in photos:
+        key_base = f"uploads/{current_user.user_id}/{p.photo_id}"
+        thumb_urls = {
+            "thumb_256": sign_b2_url(f"{key_base}/thumbnails/thumb_256.jpg"),
+            "thumb_512": sign_b2_url(f"{key_base}/thumbnails/thumb_512.jpg"),
+            "thumb_1024": sign_b2_url(f"{key_base}/thumbnails/thumb_1024.jpg"),
+            "original": sign_b2_url(f"{key_base}/original/{p.filename}")
+        }
+        
+        photos_data.append({
             "photo_id": str(p.photo_id),
             "filename": p.filename,
             "mime_type": p.mime_type,
             "size_bytes": p.size_bytes,
             "uploaded_at": p.uploaded_at.isoformat(),
-            "favorite": p.favorite
-        }
-        for p in photos
-    ]
+            "favorite": p.favorite,
+            "thumb_urls": thumb_urls,
+            "caption": p.caption, # Added caption just in case
+            "taken_at": p.taken_at # Added taken_at if needed
+        })
     
     return AlbumDetailResponse(
         album_id=str(album.album_id),

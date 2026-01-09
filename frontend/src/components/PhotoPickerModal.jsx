@@ -85,7 +85,7 @@ export default function PhotoPickerModal({ isOpen, onClose, onAdd, existingPhoto
                                         onClick={() => toggleSelection(photo.photo_id)}
                                     >
                                         <img
-                                            src={`/api/v1/photos/${photo.photo_id}/thumbnail/512?token=${localStorage.getItem('access_token')}`}
+                                            src={photo.thumb_urls.thumb_512}
                                             alt={photo.filename}
                                             loading="lazy"
                                         />

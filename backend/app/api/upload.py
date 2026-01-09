@@ -14,6 +14,7 @@ from app.api.auth import get_current_user
 from app.models.user import User
 from app.models.photo import Photo
 from app.services.b2_service import b2_service
+from app.celery_app import celery_app
 
 router = APIRouter()
 
@@ -153,8 +154,8 @@ async def confirm_upload(
     await db.commit()
     await db.refresh(photo)
     
-    # TODO: Enqueue Celery job for processing
-    # celery_app.send_task('process_upload', args=[request.upload_id, str(photo.photo_id)])
+    # Enqueue Celery job for processing
+    celery_app.send_task('app.workers.thumbnail_worker.process_upload', args=[request.upload_id, str(photo.photo_id)])
     
     return ConfirmResponse(
         photo_id=str(photo.photo_id),

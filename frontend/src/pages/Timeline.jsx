@@ -98,22 +98,27 @@ export default function Timeline({ favoritesOnly = false }) {
     }
 
     const handleDownload = async (photo) => {
-        const url = `/api/v1/photos/${photo.photo_id}/download?token=${localStorage.getItem('access_token')}`
+        // Use the pre-signed secure URL
+        const url = photo.thumb_urls.original || `/api/v1/photos/${photo.photo_id}/download`
+
         const link = document.createElement('a')
         link.href = url
         link.download = photo.filename
+        link.target = "_blank" // Open in new tab if download is blocked by CORS/headers
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
     }
 
     const handleShare = (photo) => {
-        const url = `${window.location.origin}/api/v1/photos/${photo.photo_id}/download?token=${localStorage.getItem('access_token')}`
+        // Share the secure temporal link
+        const url = photo.thumb_urls.original || `${window.location.origin}/api/v1/photos/${photo.photo_id}/download`
+
         if (navigator.share) {
             navigator.share({ title: photo.filename, url })
         } else {
             navigator.clipboard.writeText(url)
-            alert('Link copied to clipboard!')
+            alert('Secure temporary link copied to clipboard!')
         }
     }
 
