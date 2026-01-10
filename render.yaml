@@ -23,3 +23,7 @@ services:
         sync: false
       - key: B2_BUCKET_NAME
         sync: false
+      - key: B2_BUCKET_ID
+        sync: false
+      - key: JWT_SECRET_KEY
+        sync: false
