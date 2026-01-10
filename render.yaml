@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: photobomb-backend
+    runtime: docker
+    region: singapore # Closest to Sydney (Supabase)
+    plan: free
+    dockerContext: ./backend
+    dockerfilePath: ./backend/Dockerfile
+    # Use our custom script to run both Worker and Web in one container (Save $$)
+    startCommand: ./scripts/start_prod.sh
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: DATABASE_URL
+        sync: false # User will input this in dashboard
+      - key: REDIS_URL
+        sync: false
+      - key: B2_APPLICATION_KEY_ID
+        sync: false
+      - key: B2_APPLICATION_KEY
+        sync: false
+      - key: B2_BUCKET_NAME
+        sync: false
