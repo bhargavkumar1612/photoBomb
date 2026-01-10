@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import api from '../services/api'
 
 const AuthContext = createContext(null)
@@ -8,6 +9,7 @@ export function AuthProvider({ children }) {
     const [user, setUser] = useState(null)
     const [loading, setLoading] = useState(true)
     const navigate = useNavigate()
+    const queryClient = useQueryClient()
 
     useEffect(() => {
         // Check for existing token on mount
@@ -56,6 +58,8 @@ export function AuthProvider({ children }) {
         localStorage.removeItem('access_token')
         localStorage.removeItem('refresh_token')
         setUser(null)
+        // Clear all cached data (photos, albums, etc.) so next user starts fresh
+        queryClient.removeQueries()
         navigate('/login')
     }
 
