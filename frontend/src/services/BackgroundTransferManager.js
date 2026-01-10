@@ -40,13 +40,24 @@ class BackgroundTransferManager {
     }
 
     async uploadFiles(files) {
-        const registration = await navigator.serviceWorker.ready
-        if (!registration.backgroundFetch) {
-            throw new Error('Background Fetch not supported')
-        }
-
         // Get the API base URL from environment (critical for production where frontend/backend are on different domains)
         const apiBaseUrl = import.meta.env.VITE_API_URL || '/api/v1'
+
+        // Check if cross-origin (dev testing scenario: localhost -> production)
+        const isCrossOrigin = apiBaseUrl.startsWith('http') && !apiBaseUrl.includes(window.location.origin)
+
+        // Fallback to regular fetch for cross-origin (Background Fetch has restrictions)
+        if (isCrossOrigin) {
+            console.log('Using regular fetch for cross-origin upload')
+            return this.uploadWithFetch(files, apiBaseUrl)
+        }
+
+        // Use Background Fetch for same-origin
+        const registration = await navigator.serviceWorker.ready
+        if (!registration.backgroundFetch) {
+            // Fallback if Background Fetch not supported
+            return this.uploadWithFetch(files, apiBaseUrl)
+        }
 
         const uploadId = `upload-${Date.now()}`
         const requests = files.map(file => {
@@ -76,9 +87,41 @@ class BackgroundTransferManager {
 
             return bgFetch
         } catch (err) {
-            console.error('Background Fetch failed', err)
-            throw err
+            console.error('Background Fetch failed, falling back to regular fetch', err)
+            return this.uploadWithFetch(files, apiBaseUrl)
         }
+    }
+
+    async uploadWithFetch(files, apiBaseUrl) {
+        const token = localStorage.getItem('access_token')
+        const results = []
+
+        for (const file of files) {
+            const formData = new FormData()
+            formData.append('file', file)
+
+            try {
+                const response = await fetch(`${apiBaseUrl}/upload/direct?filename=${encodeURIComponent(file.name)}`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: formData
+                })
+
+                if (!response.ok) {
+                    throw new Error(`Upload failed: ${response.statusText}`)
+                }
+
+                const data = await response.json()
+                results.push(data)
+            } catch (err) {
+                console.error(`Failed to upload ${file.name}:`, err)
+                throw err
+            }
+        }
+
+        return { id: 'fetch-upload', results }
     }
 }
 

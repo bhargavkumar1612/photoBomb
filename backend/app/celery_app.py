@@ -3,12 +3,22 @@ Celery application configuration.
 """
 from celery import Celery
 from app.core.config import settings
+import ssl
+
+# Configure SSL for Redis if using rediss://
+redis_backend_use_ssl = {}
+if settings.REDIS_URL.startswith('rediss://'):
+    redis_backend_use_ssl = {
+        'ssl_cert_reqs': ssl.CERT_NONE  # For services like Upstash that handle certs
+    }
 
 # Create Celery app
 celery_app = Celery(
     "photobomb",
     broker=settings.REDIS_URL,
-    backend=settings.REDIS_URL
+    backend=settings.REDIS_URL,
+    broker_use_ssl=redis_backend_use_ssl if settings.REDIS_URL.startswith('rediss://') else None,
+    redis_backend_use_ssl=redis_backend_use_ssl if settings.REDIS_URL.startswith('rediss://') else None,
 )
 
 # Configuration
