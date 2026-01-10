@@ -23,6 +23,7 @@ pyjwt==2.8.0
 bcrypt==4.1.2
 python-jose[cryptography]==3.3.0
 passlib==1.7.4
+google-auth==2.27.0
 
 # --- Storage ---
 b2sdk==1.31.0
