@@ -27,3 +27,5 @@ services:
         sync: false
       - key: JWT_SECRET_KEY
         sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
