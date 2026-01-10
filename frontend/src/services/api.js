@@ -31,7 +31,8 @@ api.interceptors.response.use(
 
             try {
                 const refreshToken = localStorage.getItem('refresh_token')
-                const response = await axios.post('/api/v1/auth/refresh', {
+                // Use api instance to ensure correct baseURL in production
+                const response = await api.post('/auth/refresh', {
                     refresh_token: refreshToken
                 })
 

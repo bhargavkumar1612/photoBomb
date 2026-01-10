@@ -27,12 +27,13 @@ export default function Lightbox({ photo, photos, onClose, onNavigate }) {
     useEffect(() => {
         if (!photos || photos.length === 0) return
         const token = localStorage.getItem('access_token')
+        const apiBaseUrl = import.meta.env.VITE_API_URL || '/api/v1'
 
         const preloadImage = (index) => {
             if (index >= 0 && index < photos.length) {
                 const img = new Image()
                 const photo = photos[index]
-                img.src = photo.thumb_urls.original || `/api/v1/photos/${photo.photo_id}/download`
+                img.src = photo.thumb_urls.original || `${apiBaseUrl}/photos/${photo.photo_id}/download`
             }
         }
 
@@ -79,6 +80,7 @@ export default function Lightbox({ photo, photos, onClose, onNavigate }) {
     if (!photo || !photos || photos.length === 0) return null
 
     const currentPhoto = photos[currentIndex]
+    const apiBaseUrl = import.meta.env.VITE_API_URL || '/api/v1'
 
     const formatDate = (dateString) => {
         return new Date(dateString).toLocaleDateString('en-US', {
@@ -130,7 +132,7 @@ export default function Lightbox({ photo, photos, onClose, onNavigate }) {
 
                     <img
                         key={currentPhoto.photo_id}
-                        src={currentPhoto.thumb_urls.original || `/api/v1/photos/${currentPhoto.photo_id}/download`}
+                        src={currentPhoto.thumb_urls.original || `${apiBaseUrl}/photos/${currentPhoto.photo_id}/download`}
                         alt={currentPhoto.filename}
                         className={`lightbox-image ${loading ? 'loading' : 'loaded'}`}
                         onLoad={() => setLoading(false)}
@@ -155,7 +157,7 @@ export default function Lightbox({ photo, photos, onClose, onNavigate }) {
                     </div>
                     <div className="lightbox-actions">
                         <a
-                            href={currentPhoto.thumb_urls.original || `/api/v1/photos/${currentPhoto.photo_id}/download`}
+                            href={currentPhoto.thumb_urls.original || `${apiBaseUrl}/photos/${currentPhoto.photo_id}/download`}
                             download={currentPhoto.filename}
                             className="lightbox-action-btn"
                             title="Download"

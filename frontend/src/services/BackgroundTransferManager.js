@@ -45,12 +45,15 @@ class BackgroundTransferManager {
             throw new Error('Background Fetch not supported')
         }
 
+        // Get the API base URL from environment (critical for production where frontend/backend are on different domains)
+        const apiBaseUrl = import.meta.env.VITE_API_URL || '/api/v1'
+
         const uploadId = `upload-${Date.now()}`
         const requests = files.map(file => {
             const formData = new FormData()
             formData.append('file', file)
-            // Append filename to URL so we can identify it in the widget later
-            const url = `/api/v1/upload/direct?filename=${encodeURIComponent(file.name)}`
+            // Use absolute URL for cross-origin uploads in production
+            const url = `${apiBaseUrl}/upload/direct?filename=${encodeURIComponent(file.name)}`
             return new Request(url, {
                 method: 'POST',
                 headers: {

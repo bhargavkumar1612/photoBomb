@@ -79,7 +79,8 @@ export default function AlbumDetail() {
 
     const handleDownload = (photo) => {
         // Use signed URL
-        const url = photo.thumb_urls.original || `/api/v1/photos/${photo.photo_id}/download`
+        const apiBaseUrl = import.meta.env.VITE_API_URL || '/api/v1'
+        const url = photo.thumb_urls.original || `${apiBaseUrl}/photos/${photo.photo_id}/download`
         const link = document.createElement('a')
         link.href = url
         link.download = photo.filename

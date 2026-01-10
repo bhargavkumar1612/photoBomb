@@ -215,12 +215,34 @@ async def direct_upload(
         temp_file.write(file_content)
         temp_path = temp_file.name
     
+    # Detect MIME type from filename if content_type is unreliable
+    import mimetypes
+    detected_mime_type = file.content_type
+    if not detected_mime_type or detected_mime_type == "application/octet-stream":
+        # Try to detect from filename
+        guessed_type, _ = mimetypes.guess_type(file.filename)
+        if guessed_type:
+            detected_mime_type = guessed_type
+        elif file.filename.lower().endswith(('.jpg', '.jpeg')):
+            detected_mime_type = 'image/jpeg'
+        elif file.filename.lower().endswith('.png'):
+            detected_mime_type = 'image/png'
+        elif file.filename.lower().endswith('.heic'):
+            detected_mime_type = 'image/heic'
+        elif file.filename.lower().endswith('.webp'):
+            detected_mime_type = 'image/webp'
+        elif file.filename.lower().endswith('.avif'):
+            detected_mime_type = 'image/avif'
+        else:
+            # Default to jpeg if we can't detect
+            detected_mime_type = 'image/jpeg'
+    
     try:
         # Create photo record FIRST to get the photo_id
         photo = Photo(
             user_id=current_user.user_id,
             filename=file.filename,
-            mime_type=file.content_type or "application/octet-stream",
+            mime_type=detected_mime_type,
             size_bytes=len(file_content),
             sha256=sha256_hash,
             uploaded_at=datetime.utcnow()
