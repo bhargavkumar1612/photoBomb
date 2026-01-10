@@ -7,7 +7,7 @@ services:
     dockerContext: ./backend
     dockerfilePath: ./backend/Dockerfile
     # Use our custom script to run both Worker and Web in one container (Save $$)
-    startCommand: ./scripts/start_prod.sh
+    # startCommand moved to Dockerfile
     envVars:
       - key: PORT
         value: 10000
