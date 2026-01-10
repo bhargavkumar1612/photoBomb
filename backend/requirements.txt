@@ -41,6 +41,7 @@ redis==5.0.1
 # --- Utilities ---
 python-dotenv==1.0.0
 httpx==0.26.0
+requests==2.31.0
 structlog==24.1.0
 prometheus-client==0.19.0
 
