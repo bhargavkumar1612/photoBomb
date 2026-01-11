@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from app.core.config import settings
 from app.core.database import init_db, close_db
 from app.api import auth, upload, photos, albums
+from app.routers import sharing
 
 
 @asynccontextmanager
@@ -53,6 +54,7 @@ app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(upload.router, prefix="/api/v1/upload", tags=["upload"])
 app.include_router(photos.router, prefix="/api/v1/photos", tags=["photos"])
 app.include_router(albums.router, prefix="/api/v1/albums", tags=["albums"])
+app.include_router(sharing.router, prefix="/api/v1", tags=["sharing"])
 
 
 @app.get("/")

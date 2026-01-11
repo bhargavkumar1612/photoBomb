@@ -274,9 +274,14 @@ async def direct_upload(
         current_user.storage_used_bytes += len(file_content)
         await db.commit()
         
+        # Enqueue Celery job for processing (thumbnails, metadata, AI)
+        from app.celery_app import celery_app
+        # We pass photo_id as upload_id because direct upload stores file at photo_id path
+        celery_app.send_task('app.workers.thumbnail_worker.process_upload', args=[str(photo.photo_id), str(photo.photo_id)])
+
         return ConfirmResponse(
             photo_id=str(photo.photo_id),
-            status="completed"
+            status="processing"
         )
     except HTTPException:
         # Re-raise HTTP exceptions

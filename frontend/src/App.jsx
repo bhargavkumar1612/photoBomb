@@ -1,6 +1,7 @@
-import { useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { SearchProvider } from './context/SearchContext'
+import AppLayout from './layouts/AppLayout'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Timeline from './pages/Timeline'
@@ -8,12 +9,12 @@ import Upload from './pages/Upload'
 import Settings from './pages/Settings'
 import Albums from './pages/Albums'
 import AlbumDetail from './pages/AlbumDetail'
+import SharedAlbumView from './pages/SharedAlbumView'
 import Trash from './pages/Trash'
-import Sidebar from './components/Sidebar'
+import PlaceholderPage from './pages/PlaceholderPage'
 import UploadProgressWidget from './components/UploadProgressWidget'
 import './App.css'
 
-// Protected Route wrapper
 function ProtectedRoute({ children }) {
     const { user, loading } = useAuth()
 
@@ -24,103 +25,38 @@ function ProtectedRoute({ children }) {
     return user ? children : <Navigate to="/login" />
 }
 
-// Layout with Sidebar
-function AppLayout({ children }) {
-    const [sidebarOpen, setSidebarOpen] = useState(false)
-
-    return (
-        <div className="app-layout">
-            <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-            <div className="main-content">
-                <button className="hamburger" onClick={() => setSidebarOpen(!sidebarOpen)}>
-                    ☰
-                </button>
-                {children}
-            </div>
-            <UploadProgressWidget />
-        </div>
-    )
-}
-
-// Placeholder components for new routes
-function Favorites() {
-    return (
-        <div className="timeline-container">
-            <header className="timeline-header">
-                <h1>Favorites</h1>
-            </header>
-            <main className="timeline-content">
-                <Timeline favoritesOnly={true} />
-            </main>
-        </div>
-    )
-}
-
-// function Trash() { ... } removed to use imported component
-
 function App() {
     return (
         <AuthProvider>
-            <Routes>
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
+            <SearchProvider>
+                <div className="app-container">
+                    <Routes>
+                        <Route path="/login" element={<Login />} />
+                        <Route path="/register" element={<Register />} />
+                        <Route path="/shared/:token" element={<SharedAlbumView />} />
 
-                <Route path="/" element={
-                    <ProtectedRoute>
-                        <AppLayout>
-                            <Timeline />
-                        </AppLayout>
-                    </ProtectedRoute>
-                } />
+                        <Route element={
+                            <ProtectedRoute>
+                                <AppLayout />
+                            </ProtectedRoute>
+                        }>
+                            <Route path="/" element={<Timeline />} />
+                            <Route path="/explore" element={<PlaceholderPage title="Explore" />} />
+                            <Route path="/sharing" element={<PlaceholderPage title="Sharing" />} />
+                            <Route path="/albums" element={<Albums />} />
+                            <Route path="/albums/:albumId" element={<AlbumDetail />} />
+                            <Route path="/people" element={<PlaceholderPage title="People" />} />
+                            <Route path="/places" element={<PlaceholderPage title="Places" />} />
+                            <Route path="/favorites" element={<Timeline favoritesOnly={true} />} />
+                            <Route path="/trash" element={<Trash />} />
+                            <Route path="/settings" element={<Settings />} />
+                            <Route path="/upload" element={<Upload />} />
+                        </Route>
+                    </Routes>
 
-                <Route path="/upload" element={
-                    <ProtectedRoute>
-                        <AppLayout>
-                            <Upload />
-                        </AppLayout>
-                    </ProtectedRoute>
-                } />
-
-                <Route path="/favorites" element={
-                    <ProtectedRoute>
-                        <AppLayout>
-                            <Timeline favoritesOnly={true} />
-                        </AppLayout>
-                    </ProtectedRoute>
-                } />
-
-                <Route path="/albums" element={
-                    <ProtectedRoute>
-                        <AppLayout>
-                            <Albums />
-                        </AppLayout>
-                    </ProtectedRoute>
-                } />
-
-                <Route path="/albums/:albumId" element={
-                    <ProtectedRoute>
-                        <AppLayout>
-                            <AlbumDetail />
-                        </AppLayout>
-                    </ProtectedRoute>
-                } />
-
-                <Route path="/trash" element={
-                    <ProtectedRoute>
-                        <AppLayout>
-                            <Trash />
-                        </AppLayout>
-                    </ProtectedRoute>
-                } />
-
-                <Route path="/settings" element={
-                    <ProtectedRoute>
-                        <AppLayout>
-                            <Settings />
-                        </AppLayout>
-                    </ProtectedRoute>
-                } />
-            </Routes>
+                    <UploadProgressWidget />
+                </div>
+            </SearchProvider>
         </AuthProvider>
     )
 }

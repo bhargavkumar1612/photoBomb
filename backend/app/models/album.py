@@ -40,6 +40,7 @@ class Album(Base):
     user = relationship("User", back_populates="albums")
     photos = relationship("Photo", secondary=album_photos, back_populates="albums")
     cover_photo = relationship("Photo", foreign_keys=[cover_photo_id])
+    share_links = relationship("ShareLink", back_populates="album", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Album {self.name} ({self.album_id})>"

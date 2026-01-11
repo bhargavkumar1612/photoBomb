@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { ListFilter } from 'lucide-react'
 import './SearchBar.css'
 
 export default function SearchBar({ onSearch, onFilterChange, filters }) {
@@ -11,16 +12,19 @@ export default function SearchBar({ onSearch, onFilterChange, filters }) {
         onSearch(value)
     }
 
-    const handleSortChange = (sortBy) => {
-        onFilterChange({ ...filters, sortBy })
-    }
+    // Close on Escape key
+    useEffect(() => {
+        const handleEsc = (e) => {
+            if (e.key === 'Escape') setShowFilters(false);
+        };
+        if (showFilters) {
+            document.addEventListener('keydown', handleEsc);
+        }
+        return () => document.removeEventListener('keydown', handleEsc);
+    }, [showFilters]);
 
-    const handleTypeChange = (fileType) => {
-        const newTypes = filters.fileTypes?.includes(fileType)
-            ? filters.fileTypes.filter(t => t !== fileType)
-            : [...(filters.fileTypes || []), fileType]
-        onFilterChange({ ...filters, fileTypes: newTypes })
-    }
+    // Close on click outside (optional helper, if needed, but user specifically asked for Esc and Close button)
+    // We'll stick to the requested explicit close button inside the panel + Esc.
 
     return (
         <div className="search-bar-container">
@@ -42,12 +46,23 @@ export default function SearchBar({ onSearch, onFilterChange, filters }) {
                     className={`filter-toggle ${showFilters ? 'active' : ''}`}
                     onClick={() => setShowFilters(!showFilters)}
                 >
-                    ⚙️ Filters
+                    <ListFilter size={18} style={{ marginRight: 6 }} />
+                    Filters
                 </button>
             </div>
 
             {showFilters && (
                 <div className="filters-panel">
+                    <div className="filters-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                        <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600' }}>Filters</h3>
+                        <button
+                            onClick={() => setShowFilters(false)}
+                            style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#6b7280' }}
+                        >
+                            ×
+                        </button>
+                    </div>
+
                     <div className="filter-section">
                         <label>Sort By</label>
                         <div className="filter-buttons">
@@ -141,6 +156,21 @@ export default function SearchBar({ onSearch, onFilterChange, filters }) {
                             onClick={() => onFilterChange({ sortBy: 'date-desc', fileTypes: [], dateFrom: '', dateTo: '' })}
                         >
                             Reset Filters
+                        </button>
+                        <button
+                            className="btn-primary-small"
+                            onClick={() => setShowFilters(false)}
+                            style={{
+                                background: '#4f46e5',
+                                color: 'white',
+                                border: 'none',
+                                padding: '8px 16px',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                marginLeft: 'auto'
+                            }}
+                        >
+                            Apply
                         </button>
                     </div>
                 </div>

@@ -1,31 +1,4 @@
-/* App Layout Styles */
-.app-layout {
-    display: flex;
-    min-height: 100vh;
-}
-
-.main-content {
-    flex: 1;
-    margin-left: 260px;
-    min-height: 100vh;
-    background: #f8f9fa;
-    position: relative;
-}
-
-.hamburger {
-    display: none;
-    position: fixed;
-    top: 16px;
-    left: 16px;
-    z-index: 98;
-    background: white;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    padding: 8px 12px;
-    font-size: 24px;
-    cursor: pointer;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
+/* App Global Styles */
 
 .loading {
     display: flex;
@@ -36,13 +9,4 @@
     color: #6b7280;
 }
 
-/* Mobile */
-@media (max-width: 768px) {
-    .main-content {
-        margin-left: 0;
-    }
-
-    .hamburger {
-        display: block;
-    }
-}
+/* Layout styles moved to layouts/AppLayout.css */

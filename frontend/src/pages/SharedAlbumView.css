@@ -1,0 +1,62 @@
+.shared-album-container {
+    background-color: #f3f4f6;
+    min-height: 100vh;
+}
+
+.shared-header {
+    background: white;
+    padding: 24px 40px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    margin-bottom: 24px;
+}
+
+.shared-header h1 {
+    font-size: 24px;
+    font-weight: 600;
+    margin: 0 0 4px 0;
+}
+
+.shared-by {
+    font-size: 14px;
+    color: #6b7280;
+    margin: 0;
+}
+
+.shared-desc {
+    margin-top: 12px;
+    font-size: 15px;
+    color: #374151;
+}
+
+.shared-content {
+    padding: 0 40px 40px 40px;
+}
+
+.shared-view-loading,
+.shared-view-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    color: #4b5563;
+}
+
+.shared-photo-item .photo-wrapper {
+    cursor: zoom-in;
+}
+
+/* Adjustments for shared view photo item */
+.shared-photo-item .photo-overlay {
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.2) 0%, transparent 40%, transparent 60%, rgba(0, 0, 0, 0.6) 100%);
+}
+
+@media (max-width: 768px) {
+    .shared-header {
+        padding: 20px;
+    }
+
+    .shared-content {
+        padding: 0 16px 40px 16px;
+    }
+}

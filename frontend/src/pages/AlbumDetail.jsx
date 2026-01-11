@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Masonry from 'react-masonry-css'
-import { Plus } from 'lucide-react'
+import { Plus, Share2 } from 'lucide-react'
 import Lightbox from '../components/Lightbox'
 import PhotoPickerModal from '../components/PhotoPickerModal'
+import ShareModal from '../components/ShareModal'
 import PhotoItem from '../components/PhotoItem'
 import PhotoCardSkeleton from '../components/skeletons/PhotoCardSkeleton'
 import api from '../services/api'
@@ -16,6 +17,7 @@ export default function AlbumDetail() {
     const queryClient = useQueryClient()
     const [lightboxPhoto, setLightboxPhoto] = useState(null)
     const [isPickerOpen, setIsPickerOpen] = useState(false)
+    const [isShareModalOpen, setIsShareModalOpen] = useState(false)
     const [uploadingCount, setUploadingCount] = useState(0)
     const [gridSize, setGridSize] = useState(localStorage.getItem('gridSize') || 'comfortable')
 
@@ -115,6 +117,10 @@ export default function AlbumDetail() {
                     <span className="album-detail-count">{album.photo_count} photos</span>
                 </div>
                 <div className="album-detail-actions">
+                    <button className="btn-secondary" onClick={() => setIsShareModalOpen(true)} style={{ marginRight: '8px' }}>
+                        <Share2 size={18} style={{ marginRight: 6 }} />
+                        Share
+                    </button>
                     <button className="btn-primary" onClick={() => setIsPickerOpen(true)}>
                         <Plus size={18} style={{ marginRight: 6 }} />
                         Add Photos
@@ -123,6 +129,7 @@ export default function AlbumDetail() {
             </div>
 
             {/* Photos Grid */}
+            {/* ... (existing grid code) ... */}
             {(!album.photos || album.photos.length === 0) && uploadingCount === 0 ? (
                 <div className="empty-state">
                     <h3>Album is empty</h3>
@@ -176,6 +183,13 @@ export default function AlbumDetail() {
                 onClose={() => setIsPickerOpen(false)}
                 onAdd={handleAddPhotos}
                 existingPhotoIds={album.photos ? album.photos.map(p => p.photo_id) : []}
+            />
+
+            {/* Share Modal */}
+            <ShareModal
+                isOpen={isShareModalOpen}
+                onClose={() => setIsShareModalOpen(false)}
+                albumId={albumId}
             />
         </div>
     )

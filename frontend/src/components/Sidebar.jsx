@@ -1,78 +1,72 @@
-import { Link, useLocation } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { Home, Folder, Star, Trash2, Settings, Cloud } from 'lucide-react'
-import api from '../services/api'
-import './Sidebar.css'
+import { NavLink, Link } from 'react-router-dom';
+import {
+    Image,
+    Search,
+    Share2,
+    FolderHeart,
+    Users,
+    MapPin,
+    Trash2,
+    Settings,
+    Camera
+} from 'lucide-react';
+import './Sidebar.css';
 
 export default function Sidebar({ isOpen, onClose }) {
-    const location = useLocation()
-
-    // Fetch real user data for storage
-    const { data: userData } = useQuery({
-        queryKey: ['user-info'],
-        queryFn: async () => {
-            const response = await api.get('/auth/me')
-            return response.data
-        }
-    })
-
-    const menuItems = [
-        { path: '/', icon: <Home size={20} />, label: 'Photos' },
-        { path: '/albums', icon: <Folder size={20} />, label: 'Albums' },
-        { path: '/favorites', icon: <Star size={20} />, label: 'Favorites' },
+    const navItems = [
+        { path: '/', icon: <Image size={20} />, label: 'Photos' },
+        { path: '/explore', icon: <Search size={20} />, label: 'Explore' },
+        { path: '/sharing', icon: <Share2 size={20} />, label: 'Sharing' },
+        { path: '/albums', icon: <FolderHeart size={20} />, label: 'Albums' },
+        { path: '/people', icon: <Users size={20} />, label: 'People' },
+        { path: '/places', icon: <MapPin size={20} />, label: 'Places' },
         { path: '/trash', icon: <Trash2 size={20} />, label: 'Trash' },
-        { path: '/settings', icon: <Settings size={20} />, label: 'Settings' },
-    ]
-
-    const formatBytes = (bytes) => {
-        if (!bytes) return '0 GB'
-        const gb = bytes / (1024 * 1024 * 1024)
-        return gb.toFixed(1) + ' GB'
-    }
-
-    const storagePercent = userData
-        ? (userData.storage_used_bytes / userData.storage_quota_bytes) * 100
-        : 0
+    ];
 
     return (
         <>
-            {/* Mobile overlay */}
-            {isOpen && (
-                <div className="sidebar-overlay" onClick={onClose} />
-            )}
+            {/* Mobile Overlay */}
+            <div
+                className={`sidebar-overlay ${isOpen ? 'visible' : ''}`}
+                onClick={onClose}
+            />
 
-            {/* Sidebar */}
-            <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
-                <div className="sidebar-header">
-                    <h2 className="sidebar-logo">PhotoBomb</h2>
-                    <button className="sidebar-close" onClick={onClose}>×</button>
-                </div>
+            <aside className={`sidebar ${isOpen ? '' : 'collapsed'}`}>
+                {/* Logo */}
+                <Link to="/" className="sidebar-logo">
+                    <div className="sidebar-logo-icon">
+                        <Camera color="#4f46e5" size={28} />
+                    </div>
+                    <span className="sidebar-logo-text">PhotoBomb</span>
+                </Link>
 
+                {/* Navigation */}
                 <nav className="sidebar-nav">
-                    {menuItems.map((item) => (
-                        <Link
+                    {navItems.map((item) => (
+                        <NavLink
                             key={item.path}
                             to={item.path}
-                            className={`sidebar-item ${location.pathname === item.path ? 'active' : ''}`}
-                            onClick={onClose}
+                            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+                            onClick={() => window.innerWidth <= 768 && onClose()}
                         >
-                            <span className="sidebar-icon">{item.icon}</span>
-                            <span className="sidebar-label">{item.label}</span>
-                        </Link>
+                            <span className="nav-item-icon">{item.icon}</span>
+                            <span className="nav-item-text">{item.label}</span>
+                        </NavLink>
                     ))}
                 </nav>
 
+                {/* Footer / Settings */}
                 <div className="sidebar-footer">
-                    <div className="storage-info">
-                        <div className="storage-bar">
-                            <div className="storage-used" style={{ width: `${storagePercent}%` }}></div>
-                        </div>
-                        <p className="storage-text">
-                            {formatBytes(userData?.storage_used_bytes)} of {formatBytes(userData?.storage_quota_bytes)} used
-                        </p>
-                    </div>
+                    <NavLink
+                        to="/settings"
+                        className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+                        onClick={() => window.innerWidth <= 768 && onClose()}
+                    >
+                        <span className="nav-item-icon"><Settings size={20} /></span>
+                        <span className="nav-item-text">Settings</span>
+                    </NavLink>
                 </div>
             </aside>
         </>
-    )
+    );
 }

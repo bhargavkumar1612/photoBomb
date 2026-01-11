@@ -37,4 +37,9 @@ celery_app.conf.update(
 )
 
 # Auto-discover tasks
-celery_app.autodiscover_tasks(['app.workers'])
+# Auto-discover tasks
+# celery_app.autodiscover_tasks(['app.workers'])
+celery_app.conf.imports = [
+    'app.workers.thumbnail_worker',
+    # 'app.workers.face_worker', # Uncomment when face worker is ready
+]

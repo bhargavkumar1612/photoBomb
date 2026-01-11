@@ -4,16 +4,99 @@ Processes uploaded photos and generates multiple thumbnail sizes.
 """
 from celery import Task
 from app.celery_app import celery_app
-import pyvips
+try:
+    import pyvips
+    HAS_PYVIPS = True
+except (ImportError, OSError):
+    HAS_PYVIPS = False
+    print("Warning: libvips not found, falling back to PIL for thumbnails.")
+
 import hashlib
 import imagehash
-from PIL import Image
+from PIL import Image, ImageOps
 from typing import Tuple
 import os
 import tempfile
 from datetime import datetime
 
 from app.services.b2_service import b2_service
+
+
+# ... (CallbackTask and process_upload remain same, just ensure global HAS_PYVIPS is used if needed, or function abstraction handles it)
+
+def generate_thumbnail(
+    input_path: str,
+    output_path: str,
+    size: int,
+    format: str = "webp"
+) -> Tuple[int, int]:
+    """
+    Generate thumbnail using libvips (preferred) or PIL (fallback).
+    """
+    if HAS_PYVIPS:
+        try:
+            return _generate_thumbnail_vips(input_path, output_path, size, format)
+        except Exception as e:
+            print(f"VIPS failed ({e}), falling back to PIL")
+            # Fallthrough to PIL
+            pass
+            
+    return _generate_thumbnail_pil(input_path, output_path, size, format)
+
+
+def _generate_thumbnail_vips(input_path, output_path, size, format) -> Tuple[int, int]:
+    # Load image
+    image = pyvips.Image.new_from_file(input_path, access='sequential')
+    
+    # Auto-rotate based on EXIF orientation
+    image = image.autorot()
+    
+    # Calculate scale factor
+    scale = size / max(image.width, image.height)
+    if scale < 1:
+        image = image.resize(scale, kernel='lanczos3')
+    
+    # Format-specific options
+    if format == 'webp':
+        image.write_to_file(output_path, Q=85, strip=True)
+    elif format == 'avif':
+        image.write_to_file(output_path, Q=75, speed=6, strip=True)
+    else:  # jpeg
+        image.write_to_file(output_path, Q=90, optimize_coding=True, strip=False)
+    
+    return (image.width, image.height)
+
+
+def _generate_thumbnail_pil(input_path, output_path, size, format) -> Tuple[int, int]:
+    with Image.open(input_path) as img:
+        # Auto-rotate
+        img = ImageOps.exif_transpose(img)
+        
+        # Calculate new size maintaining aspect ratio
+        img.thumbnail((size, size), Image.Resampling.LANCZOS)
+        
+        # Save
+        if format == 'webp':
+            img.save(output_path, 'WEBP', quality=85)
+        elif format == 'avif':
+            # PIL might not support AVIF out of box without plugin, fallback to webp or jpeg?
+            # Safe fallback: jpeg if avif requested but not supported? 
+            # Assuming env has support or we just try. 
+            # If fail, use WEBP?
+            try:
+                img.save(output_path, 'AVIF', quality=75, speed=6)
+            except:
+                print("AVIF not supported by PIL, saving as WEBP")
+                img.save(output_path, 'WEBP', quality=85)
+        else: # jpeg usually
+            # Convert RGBA to RGB for JPEG
+            if img.mode in ('RGBA', 'LA'):
+                background = Image.new(img.mode[:-1], img.size, (255, 255, 255))
+                background.paste(img, img.split()[-1])
+                img = background.convert('RGB')
+            img.save(output_path, 'JPEG', quality=90, optimize=True)
+            
+        return img.size
 
 
 class CallbackTask(Task):
@@ -138,10 +221,52 @@ def process_upload(self, upload_id: str, photo_id: str):
                 phash = compute_perceptual_hash(tmp_path)
                 size_bytes = len(original_bytes)
                 
+                # 4a. Attempt to extract date from filename if taken_at is missing (e.g., WhatsApp)
+                # WhatsApp format: "WhatsApp Image 2025-10-25 at 16.37.02.jpeg"
+                import re
+                filename_date = None
+                
+                # Regex for WhatsApp matching: YYYY-MM-DD at HH.MM.SS
+                # Also matches "IMG-20251025-WA0001" style if needed, but let's target the specific one seen
+                wa_pattern = re.search(r"(\d{4}-\d{2}-\d{2}) at (\d{2}\.\d{2}\.\d{2})", photo.filename)
+                if wa_pattern:
+                    try:
+                        date_str = wa_pattern.group(1)
+                        time_str = wa_pattern.group(2).replace('.', ':')
+                        filename_date = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M:%S")
+                        print(f"Extracted date from filename: {filename_date}")
+                    except ValueError:
+                        pass
+                
+                # Fallback: YYYYMMDD_HHMMSS or IMG_YYYYMMDD_HHMMSS
+                if not filename_date:
+                    compact_pattern = re.search(r"(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})", photo.filename)
+                    if compact_pattern:
+                        try:
+                            # Verify years are reasonable (e.g. 2000-2099)
+                            if 2000 <= int(compact_pattern.group(1)) <= 2099:
+                                filename_date = datetime(
+                                    int(compact_pattern.group(1)),
+                                    int(compact_pattern.group(2)),
+                                    int(compact_pattern.group(3)),
+                                    int(compact_pattern.group(4)),
+                                    int(compact_pattern.group(5)),
+                                    int(compact_pattern.group(6))
+                                )
+                                print(f"Extracted date from compact filename: {filename_date}")
+                        except ValueError:
+                            pass
+
                 # Update DB
                 photo.size_bytes = size_bytes
                 photo.sha256 = sha256
                 photo.phash = str(phash)
+                
+                # Update taken_at if found in filename and not already set (EXIF would set it if implemented, but we aren't doing full EXIF here yet)
+                # TODO: Implement full EXIF extraction. For now, filename fallback is good.
+                if filename_date:
+                    photo.taken_at = filename_date
+                
                 photo.processed_at = datetime.utcnow()
                 
                 await db.commit()
@@ -166,44 +291,17 @@ def process_upload(self, upload_id: str, photo_id: str):
     }
 
 
-def generate_thumbnail(
-    input_path: str,
-    output_path: str,
-    size: int,
-    format: str = "webp"
-) -> Tuple[int, int]:
-    """
-    Generate thumbnail using libvips.
-    
-    Args:
-        input_path: Path to source image
-        output_path: Path to save thumbnail
-        size: Longest edge size in pixels
-        format: Output format (webp, avif, jpeg)
-    
-    Returns:
-        Tuple of (width, height) of generated thumbnail
-    """
-    # Load image
-    image = pyvips.Image.new_from_file(input_path, access='sequential')
-    
-    # Auto-rotate based on EXIF orientation
-    image = image.autorot()
-    
-    # Calculate scale factor
-    scale = size / max(image.width, image.height)
-    if scale < 1:
-        image = image.resize(scale, kernel='lanczos3')
-    
-    # Format-specific options
-    if format == 'webp':
-        image.write_to_file(output_path, Q=85, strip=True)
-    elif format == 'avif':
-        image.write_to_file(output_path, Q=75, speed=6, strip=True)
-    else:  # jpeg
-        image.write_to_file(output_path, Q=90, optimize_coding=True, strip=False)
-    
-    return (image.width, image.height)
+# Function body replaced by previous block, ensuring we don't duplicate. 
+# Actually, the previous tool call might have replaced imports but mismatched the TargetContent if I wasn't careful.
+# Let's check what I replaced. 
+# I replaced from line 7 to START of generate_thumbnail?
+# The TargetContent in previous call was "import pyvips... from app.services.b2_service import b2_service".
+# That covers imports. 
+# Now I need to delete the OLD generate_thumbnail function implementation because I redefined it in the previous block?
+# NO, I defined `generate_thumbnail` in the previous REPLACEMENT string, but I replaced the IMPORTS block.
+# So now `generate_thumbnail` is defined TWICE?
+# Yes, likely. I need to remove the old implementation.
+
 
 
 def compute_perceptual_hash(image_path: str) -> int:

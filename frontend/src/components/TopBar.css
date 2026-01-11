@@ -1,0 +1,105 @@
+.top-bar {
+    height: 64px;
+    background: white;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+}
+
+.mobile-menu-btn {
+    display: none;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    color: #4b5563;
+}
+
+/* Search Area */
+.top-bar-search {
+    flex: 1;
+    max-width: 720px;
+    margin: 0 40px;
+}
+
+/* Override SearchBar container when inside TopBar */
+.top-bar-search .search-bar-container {
+    margin-bottom: 0;
+}
+
+.top-bar-search .search-input-wrapper {
+    background: #f3f4f6;
+    border: 1px solid transparent;
+    transition: all 0.2s;
+}
+
+.top-bar-search .search-input-wrapper:focus-within {
+    background: white;
+    border-color: #e5e7eb;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.top-bar-search .search-input,
+.top-bar-search .search-input::placeholder {
+    background: transparent;
+}
+
+/* Actions Area */
+.top-bar-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.btn-upload-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #2563eb;
+    color: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s;
+    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+}
+
+.btn-upload-pill:hover {
+    background: #1d4ed8;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px rgba(37, 99, 235, 0.3);
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+    .top-bar {
+        padding: 0 16px;
+        gap: 12px;
+    }
+
+    .mobile-menu-btn {
+        display: block;
+    }
+
+    .top-bar-search {
+        display: none;
+        /* Hide search on mobile initially or use icon */
+        margin: 0;
+    }
+
+    .btn-upload-pill span {
+        display: none;
+    }
+
+    .btn-upload-pill {
+        padding: 8px;
+        border-radius: 50%;
+    }
+}

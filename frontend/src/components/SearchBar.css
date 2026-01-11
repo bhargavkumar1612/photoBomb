@@ -1,6 +1,10 @@
 /* Search Bar Styles */
 .search-bar-container {
-    margin-bottom: 24px;
+    width: 100%;
+    margin-bottom: 0;
+    /* Remove bottom margin as TopBar handles layout */
+    position: relative;
+    /* Context for absolute filters */
 }
 
 .search-input-wrapper {
@@ -9,78 +13,81 @@
     gap: 12px;
     background: white;
     border-radius: 12px;
-    padding: 12px 16px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    padding: 6px 16px;
+    /* Reduced vertical padding */
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    border: 1px solid #e5e7eb;
+    height: 48px;
+    /* Explicit height */
+    box-sizing: border-box;
+    /* Ensure padding doesn't affect width */
 }
 
+/* Ensure flex items works */
 .search-icon {
     font-size: 20px;
     color: #9ca3af;
+    display: flex;
+    align-items: center;
 }
 
 .search-input {
     flex: 1;
-    border: none;
-    outline: none;
+    border: none !important;
+    /* Force remove border */
+    outline: none !important;
+    /* Force remove outline */
+    background: transparent !important;
     font-size: 15px;
     color: #1f2937;
-}
-
-.search-input::placeholder {
-    color: #9ca3af;
-}
-
-.clear-search {
-    background: none;
-    border: none;
-    font-size: 24px;
-    color: #9ca3af;
-    cursor: pointer;
+    height: 100%;
     padding: 0;
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    transition: all 0.2s;
+    margin: 0;
+    min-width: 0;
+    /* Allow flex shrinking */
 }
 
-.clear-search:hover {
-    background: #f3f4f6;
-    color: #374151;
-}
-
+/* Fix for the filters button looking cramped */
 .filter-toggle {
-    background: white;
-    border: 1px solid #e5e7eb;
-    padding: 8px 16px;
+    background: #f3f4f6;
+    /* Subtle background */
+    border: none;
+    /* Remove border */
+    padding: 8px 12px;
     border-radius: 8px;
     font-size: 14px;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s;
     color: #374151;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    /* Prevent text wrapping */
+    height: 32px;
+    /* Fixed height match */
 }
 
-.filter-toggle:hover {
-    border-color: #667eea;
-    color: #667eea;
-}
-
-.filter-toggle.active {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border-color: transparent;
-}
+/* ... existing styles ... */
 
 /* Filters Panel */
 .filters-panel {
+    position: absolute;
+    /* Absolute positioning to float over content */
+    top: 100%;
+    left: 0;
+    width: 100%;
+    min-width: 300px;
     background: white;
     border-radius: 12px;
     padding: 20px;
-    margin-top: 12px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    margin-top: 8px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    /* Stronger shadow for floating panel */
+    z-index: 1000;
+    /* High z-index to stay on top */
+    border: 1px solid #e5e7eb;
 }
 
 .filter-section {

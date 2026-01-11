@@ -1,0 +1,73 @@
+.share-modal {
+    max-width: 500px;
+    width: 100%;
+}
+
+.share-actions {
+    margin-bottom: 24px;
+    display: flex;
+    justify-content: center;
+}
+
+.active-links h3 {
+    font-size: 14px;
+    color: #6b7280;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.links-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.link-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+}
+
+.link-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.link-icon {
+    color: #6b7280;
+}
+
+.link-details {
+    display: flex;
+    flex-direction: column;
+}
+
+.link-url {
+    font-size: 14px;
+    font-weight: 500;
+    color: #111827;
+}
+
+.link-meta {
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.link-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.empty-text,
+.loading-text {
+    text-align: center;
+    color: #9ca3af;
+    font-size: 14px;
+    padding: 20px 0;
+}
