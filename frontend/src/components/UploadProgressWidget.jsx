@@ -11,15 +11,75 @@ export default function UploadProgressWidget() {
     const queryClient = useQueryClient();
     const pollingInterval = useRef(null);
 
-    // Initial check
+    //Initial check and event listeners
     useEffect(() => {
         checkActiveTransfers();
 
         // Poll every 2 seconds to check status of individual files
         pollingInterval.current = setInterval(checkActiveTransfers, 2000);
 
+        // Listen for custom events from regular fetch uploads
+        const handleUploadStart = (e) => {
+            const { uploadId, total } = e.detail;
+            setTransfers(prev => ({
+                ...prev,
+                [uploadId]: { state: 'uploading', downloaded: 0, downloadTotal: 0, current: 0, total }
+            }));
+            setExpanded(true);
+        };
+
+        const handleUploadProgress = (e) => {
+            const { uploadId, current, total, filename, progress } = e.detail;
+            setTransfers(prev => ({
+                ...prev,
+                [uploadId]: {
+                    ...prev[uploadId],
+                    current,
+                    total,
+                    currentFilename: filename,
+                    progress
+                }
+            }));
+        };
+
+        const handleUploadComplete = (e) => {
+            const { uploadId } = e.detail;
+            setTransfers(prev => ({
+                ...prev,
+                [uploadId]: { ...prev[uploadId], state: 'completed', progress: 100 }
+            }));
+            queryClient.invalidateQueries(['photos']);
+
+            // Auto-hide after 3 seconds
+            setTimeout(() => {
+                setTransfers(prev => {
+                    const newTransfers = { ...prev };
+                    delete newTransfers[uploadId];
+                    return newTransfers;
+                });
+            }, 3000);
+        };
+
+        const handleUploadError = (e) => {
+            const { uploadId, filename, error } = e.detail;
+            console.error(`Upload error for ${filename}:`, error);
+            setTransfers(prev => ({
+                ...prev,
+                [uploadId]: { ...prev[uploadId], state: 'error', error }
+            }));
+        };
+
+        window.addEventListener('upload-start', handleUploadStart);
+        window.addEventListener('upload-progress', handleUploadProgress);
+        window.addEventListener('upload-complete', handleUploadComplete);
+        window.addEventListener('upload-error', handleUploadError);
+
         return () => {
             if (pollingInterval.current) clearInterval(pollingInterval.current);
+            window.removeEventListener('upload-start', handleUploadStart);
+            window.removeEventListener('upload-progress', handleUploadProgress);
+            window.removeEventListener('upload-complete', handleUploadComplete);
+            window.removeEventListener('upload-error', handleUploadError);
         };
     }, []);
 
@@ -135,10 +195,23 @@ export default function UploadProgressWidget() {
                     </div>
                     <div className="header-info">
                         <span className="title">
-                            {percent >= 100 ? 'Upload Completed' : `Uploading ${activeIds.length} batch(es)`}
+                            {percent >= 100 ? 'Upload Completed' : (() => {
+                                // Check if any transfer has currentFilename (regular fetch)
+                                const activeTransfer = Object.values(transfers).find(t => t.currentFilename);
+                                if (activeTransfer) {
+                                    return `Uploading ${activeTransfer.current}/${activeTransfer.total}: ${activeTransfer.currentFilename}`;
+                                }
+                                return `Uploading ${activeIds.length} batch(es)`;
+                            })()}
                         </span>
                         <span className="subtitle">
-                            {Math.round(percent)}% • {formatBytes(totalDownloaded)} / {formatBytes(totalSize)}
+                            {(() => {
+                                const activeTransfer = Object.values(transfers).find(t => t.progress !== undefined);
+                                if (activeTransfer) {
+                                    return `${activeTransfer.progress}%`;
+                                }
+                                return `${Math.round(percent)}% • ${formatBytes(totalDownloaded)} / ${formatBytes(totalSize)}`;
+                            })()}
                         </span>
                     </div>
                 </div>

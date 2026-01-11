@@ -219,46 +219,76 @@ export default function Timeline({ favoritesOnly = false }) {
             <div className="timeline-toolbar">
                 <div className="toolbar-left">
                     <h1>{showFavoritesOnly ? 'Favorites' : 'Photos'}</h1>
+
+                    {/* Upload button - keep gradient styling */}
                     <Link to="/upload" className="btn-upload">+ Upload</Link>
+
+                    {/* Select - icon only */}
                     <button
-                        className={`btn-select ${selectionMode ? 'active' : ''}`}
+                        className={`btn-icon ${selectionMode ? 'active' : ''}`}
                         onClick={() => {
                             if (selectionMode) cancelSelection();
                             else setSelectionMode(true);
                         }}
+                        title={selectionMode ? 'Cancel Selection' : 'Select Photos'}
                     >
-                        {selectionMode ? 'Cancel Select' : 'Select'}
+                        ☑
                     </button>
 
+                    {/* Favorites - icon only */}
+                    <button
+                        className={`btn-icon ${showFavoritesOnly ? 'active' : ''}`}
+                        onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+                        title={showFavoritesOnly ? 'Show All Photos' : 'Show Favorites Only'}
+                    >
+                        ⭐
+                    </button>
+
+                    {/* Batch actions when selecting */}
                     {selectionMode && selectedPhotos.size > 0 && (
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                            <button className="btn-select active" onClick={handleBulkAddToAlbum} style={{ fontWeight: '600' }}>
-                                + Add to Album
+                        <div style={{ display: 'flex', gap: '8px', marginLeft: '8px' }}>
+                            <button className="btn-secondary" onClick={handleBulkAddToAlbum}>
+                                + Add to Album ({selectedPhotos.size})
                             </button>
-                            <button className="btn-select danger" onClick={handleBulkDelete}>
+                            <button className="btn-secondary" onClick={handleBulkDelete} style={{ color: '#dc2626', borderColor: '#fecaca' }}>
                                 🗑️ Delete ({selectedPhotos.size})
                             </button>
                         </div>
                     )}
 
-                    {/* Only show cleanup if not selecting */}
+                    {/* Cleanup - only show if not selecting */}
                     {!selectionMode && (
-                        <button onClick={handleCleanup} disabled={cleaning} className="btn-cleanup">
-                            {cleaning ? 'Cleaning...' : '🧹'}
+                        <button onClick={handleCleanup} disabled={cleaning} className="btn-icon" title="Clean up broken photos">
+                            {cleaning ? '...' : '🧹'}
                         </button>
                     )}
                 </div>
 
-                <div className="toolbar-right">
-                    <div className="grid-size-selector">
-                        <button className={gridSize === 'compact' ? 'active' : ''} onClick={() => { setGridSize('compact'); localStorage.setItem('gridSize', 'compact') }}>▦</button>
-                        <button className={gridSize === 'comfortable' ? 'active' : ''} onClick={() => { setGridSize('comfortable'); localStorage.setItem('gridSize', 'comfortable') }}>▣</button>
-                        <button className={gridSize === 'cozy' ? 'active' : ''} onClick={() => { setGridSize('cozy'); localStorage.setItem('gridSize', 'cozy') }}>▢</button>
+                {/* Grid controls - hide on mobile */}
+                <div className="toolbar-right hide-mobile">
+                    <div className="toggle-group">
+                        <button
+                            className={`toggle-btn ${gridSize === 'compact' ? 'active' : ''}`}
+                            onClick={() => { setGridSize('compact'); localStorage.setItem('gridSize', 'compact') }}
+                            title="Compact Grid"
+                        >
+                            ▦
+                        </button>
+                        <button
+                            className={`toggle-btn ${gridSize === 'comfortable' ? 'active' : ''}`}
+                            onClick={() => { setGridSize('comfortable'); localStorage.setItem('gridSize', 'comfortable') }}
+                            title="Comfortable Grid"
+                        >
+                            ▣
+                        </button>
+                        <button
+                            className={`toggle-btn ${gridSize === 'cozy' ? 'active' : ''}`}
+                            onClick={() => { setGridSize('cozy'); localStorage.setItem('gridSize', 'cozy') }}
+                            title="Cozy Grid"
+                        >
+                            ▢
+                        </button>
                     </div>
-
-                    <button className={showFavoritesOnly ? 'active' : ''} onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}>
-                        ⭐ {showFavoritesOnly ? 'All' : 'Facorites'}
-                    </button>
                 </div>
             </div>
 

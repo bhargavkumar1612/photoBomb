@@ -84,6 +84,74 @@ body {
     border-color: #9ca3af;
 }
 
+/* Icon-only button (for Select, Edit, Favorites) */
+.btn-icon {
+    background: transparent;
+    border: none;
+    padding: 8px;
+    cursor: pointer;
+    color: #6B7280;
+    transition: all 0.2s;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-icon:hover {
+    color: #4F46E5;
+    background: #F3F4F6;
+}
+
+.btn-icon.active {
+    color: #4F46E5;
+    background: #EEF2FF;
+}
+
+/* Toggle button group (for grid view controls) */
+.toggle-group {
+    display: inline-flex;
+    background: white;
+    border-radius: 8px;
+    padding: 4px;
+    border: 1px solid #E5E7EB;
+    gap: 2px;
+}
+
+.toggle-btn {
+    padding: 6px 10px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.2s;
+    color: #6B7280;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.toggle-btn:hover {
+    background: #F3F4F6;
+    color: #4F46E5;
+}
+
+.toggle-btn.active {
+    background: #4F46E5;
+    color: white;
+}
+
+/* Hide elements on mobile */
+.hide-mobile {
+    display: flex;
+}
+
+@media (max-width: 768px) {
+    .hide-mobile {
+        display: none !important;
+    }
+}
+
 /* Toolbar */
 .timeline-toolbar {
     background: white;
@@ -97,50 +165,10 @@ body {
 
 .grid-size-selector,
 .filter-buttons,
-
-.btn-select {
-    padding: 8px 16px;
-    background: white;
-    border: 1px solid #d1d5db;
-    border-radius: 6px;
-    color: #4b5563;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.btn-select.active {
-    background: #e0e7ff;
-    border-color: #6366f1;
-    color: #4f46e5;
-}
-
-.btn-select.danger {
-    color: #dc2626;
-    border-color: #fecaca;
-}
-
-.btn-select.danger:hover {
-    background: #fef2f2;
-    border-color: #dc2626;
-}
-
-.btn-cleanup {
-    background: none;
-    border: none;
-    font-size: 1.2rem;
-    cursor: pointer;
-    padding: 8px;
-    border-radius: 6px;
-}
-
-.btn-cleanup:hover {
-    background: #f3f4f6;
-}
-
-display: flex;
-gap: 8px;
-align-items: center;
+.selection-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
 }
 
 .grid-size-selector button,

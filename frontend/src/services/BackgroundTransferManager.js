@@ -93,12 +93,30 @@ class BackgroundTransferManager {
     }
 
     async uploadWithFetch(files, apiBaseUrl) {
+        const uploadId = `fetch-upload-${Date.now()}`
         const token = localStorage.getItem('access_token')
         const results = []
 
-        for (const file of files) {
+        // Emit start event
+        window.dispatchEvent(new CustomEvent('upload-start', {
+            detail: { uploadId, total: files.length }
+        }))
+
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i]
             const formData = new FormData()
             formData.append('file', file)
+
+            // Emit progress event
+            window.dispatchEvent(new CustomEvent('upload-progress', {
+                detail: {
+                    uploadId,
+                    current: i + 1,
+                    total: files.length,
+                    filename: file.name,
+                    progress: Math.round(((i + 1) / files.length) * 100)
+                }
+            }))
 
             try {
                 const response = await fetch(`${apiBaseUrl}/upload/direct?filename=${encodeURIComponent(file.name)}`, {
@@ -117,11 +135,22 @@ class BackgroundTransferManager {
                 results.push(data)
             } catch (err) {
                 console.error(`Failed to upload ${file.name}:`, err)
+
+                // Emit error event
+                window.dispatchEvent(new CustomEvent('upload-error', {
+                    detail: { uploadId, filename: file.name, error: err.message }
+                }))
+
                 throw err
             }
         }
 
-        return { id: 'fetch-upload', results }
+        // Emit completion event
+        window.dispatchEvent(new CustomEvent('upload-complete', {
+            detail: { uploadId, total: files.length, results }
+        }))
+
+        return { id: uploadId, results }
     }
 }
 
