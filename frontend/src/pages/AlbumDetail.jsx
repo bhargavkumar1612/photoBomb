@@ -100,7 +100,27 @@ export default function AlbumDetail() {
         500: 1
     }
 
-    if (isLoading) return <div className="loading">Loading album...</div>
+    if (isLoading) {
+        return (
+            <div className="timeline-container">
+                <div className="album-detail-header shim-header" style={{ marginBottom: 40 }}>
+                    {/* Minimal header skeleton */}
+                    <div className="skeleton-shimmer" style={{ width: 100, height: 20, marginBottom: 20 }}></div>
+                    <div className="skeleton-shimmer" style={{ width: 300, height: 40, marginBottom: 12 }}></div>
+                    <div className="skeleton-shimmer" style={{ width: 100, height: 20 }}></div>
+                </div>
+                <Masonry
+                    breakpointCols={breakpointColumns}
+                    className="my-masonry-grid"
+                    columnClassName="my-masonry-grid_column"
+                >
+                    {[...Array(12)].map((_, i) => (
+                        <PhotoCardSkeleton key={i} />
+                    ))}
+                </Masonry>
+            </div>
+        )
+    }
     if (error) return <div className="error">Error loading album: {error.message}</div>
     if (!album) return <div className="error">Album not found</div>
 

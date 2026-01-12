@@ -42,12 +42,30 @@ export default function SharedAlbumView() {
         document.body.removeChild(link)
     }
 
-    if (isLoading) return (
-        <div className="shared-view-loading">
-            <div className="loader"></div>
-            <p>Loading shared album...</p>
-        </div>
-    )
+    if (isLoading) {
+        return (
+            <div className="shared-album-container">
+                <header className="shared-header shim-header" style={{ marginBottom: 40 }}>
+                    <div className="shared-header-content">
+                        {/* Minimal header skeleton */}
+                        <div className="skeleton-shimmer" style={{ width: 200, height: 32, marginBottom: 12 }}></div>
+                        <div className="skeleton-shimmer" style={{ width: 150, height: 16, marginBottom: 16 }}></div>
+                    </div>
+                </header>
+                <div className="shared-content">
+                    <Masonry
+                        breakpointCols={breakpointColumns}
+                        className="my-masonry-grid"
+                        columnClassName="my-masonry-grid_column"
+                    >
+                        {[...Array(12)].map((_, i) => (
+                            <PhotoCardSkeleton key={i} />
+                        ))}
+                    </Masonry>
+                </div>
+            </div>
+        )
+    }
 
     if (error) return (
         <div className="shared-view-error">
