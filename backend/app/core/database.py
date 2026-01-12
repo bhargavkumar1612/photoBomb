@@ -16,8 +16,14 @@ print("DEBUG: Configuring database with NullPool and custom statement naming")
 
 # Create async engine
 # Force unique prepared statement names to bypass "already exists" errors
+database_url = settings.DATABASE_URL
+if database_url and database_url.startswith("postgres://"):
+    database_url = database_url.replace("postgres://", "postgresql+asyncpg://", 1)
+elif database_url and database_url.startswith("postgresql://"):
+    database_url = database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+
 engine = create_async_engine(
-    settings.DATABASE_URL,
+    database_url,
     poolclass=NullPool,
     echo=settings.DEBUG,
     future=True,
