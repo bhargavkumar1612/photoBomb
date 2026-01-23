@@ -9,6 +9,7 @@ import ShareModal from '../components/ShareModal'
 import PhotoItem from '../components/PhotoItem'
 import PhotoCardSkeleton from '../components/skeletons/PhotoCardSkeleton'
 import api from '../services/api'
+import { usePhotoFilter } from '../hooks/usePhotoFilter'
 import './Timeline.css' // Reuse Timeline styles for Masonry/Grid
 import './AlbumDetail.css'
 
@@ -30,6 +31,8 @@ export default function AlbumDetail() {
             return response.data
         }
     })
+
+    const filteredPhotos = usePhotoFilter(album?.photos)
 
     // Add photos to album mutation
     const addPhotosMutation = useMutation({
@@ -151,12 +154,18 @@ export default function AlbumDetail() {
             </div>
 
             {/* Photos Grid */}
-            {/* ... (existing grid code) ... */}
-            {(!album.photos || album.photos.length === 0) && uploadingCount === 0 ? (
+            {/* Only show empty state if NO photos exist in album logic AND we are not uploading */}
+            {/* If we have photos but filteredPhotos is empty, user should see "No photos match filter", not "Album is empty" */}
+
+            {(album.photos.length === 0 && uploadingCount === 0) ? (
                 <div className="empty-state">
                     <h3>Album is empty</h3>
                     <p>Add photos from your timeline to see them here.</p>
                     <button className="btn-primary" onClick={() => setIsPickerOpen(true)}>Add Photos</button>
+                </div>
+            ) : (filteredPhotos.length === 0 && uploadingCount === 0) ? (
+                <div className="empty-state">
+                    <h3>No photos match your filter</h3>
                 </div>
             ) : (
                 <Masonry
@@ -169,7 +178,7 @@ export default function AlbumDetail() {
                         <PhotoCardSkeleton key={`skeleton-${i}`} />
                     ))}
 
-                    {album.photos && album.photos.map(photo => (
+                    {filteredPhotos.map(photo => (
                         <PhotoItem
                             key={photo.photo_id}
                             photo={photo}
@@ -193,7 +202,7 @@ export default function AlbumDetail() {
             {lightboxPhoto && (
                 <Lightbox
                     photo={lightboxPhoto}
-                    photos={album.photos} // Enable navigation
+                    photos={filteredPhotos} // Enable navigation within filtered set
                     onClose={() => setLightboxPhoto(null)}
                     onNavigate={setLightboxPhoto}
                 />

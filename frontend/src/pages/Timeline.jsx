@@ -12,6 +12,7 @@ import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { useSearch } from '../context/SearchContext'
 import { groupPhotosByDate, groupPhotosByMonth, groupPhotosByYear } from '../utils/dateGrouping'
+import { usePhotoFilter } from '../hooks/usePhotoFilter'
 import './Timeline.css'
 
 export default function Timeline({ favoritesOnly = false }) {
@@ -134,37 +135,11 @@ export default function Timeline({ favoritesOnly = false }) {
         600: 2
     }
 
-    const filteredPhotos = useMemo(() => {
-        let photos = showFavoritesOnly || favoritesOnly ? data?.photos?.filter(p => p.favorite) : data?.photos
-        if (!photos) return []
+    const basePhotos = useMemo(() => {
+        return showFavoritesOnly || favoritesOnly ? data?.photos?.filter(p => p.favorite) : data?.photos
+    }, [data?.photos, showFavoritesOnly, favoritesOnly])
 
-        if (searchTerm) {
-            const term = searchTerm.toLowerCase()
-            photos = photos.filter(p =>
-                p.filename.toLowerCase().includes(term) ||
-                (p.caption && p.caption.toLowerCase().includes(term)) ||
-                (p.location_name && p.location_name.toLowerCase().includes(term))
-            )
-        }
-
-        if (filters.fileTypes?.length > 0) {
-            photos = photos.filter(p => filters.fileTypes.includes(p.mime_type))
-        }
-
-        if (filters.dateFrom) {
-            const fromDate = new Date(filters.dateFrom)
-            photos = photos.filter(p => new Date(p.uploaded_at) >= fromDate)
-        }
-        if (filters.dateTo) {
-            const toDate = new Date(filters.dateTo)
-            toDate.setHours(23, 59, 59)
-            photos = photos.filter(p => new Date(p.uploaded_at) <= toDate)
-        }
-
-        const sorted = [...photos]
-        sorted.sort((a, b) => new Date(b.uploaded_at) - new Date(a.uploaded_at))
-        return sorted
-    }, [data?.photos, showFavoritesOnly, searchTerm, filters, favoritesOnly])
+    const filteredPhotos = usePhotoFilter(basePhotos)
 
     const groupedPhotos = useMemo(() => {
         switch (viewMode) {
