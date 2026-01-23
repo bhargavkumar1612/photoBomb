@@ -156,10 +156,21 @@
     padding: 24px 40px 40px 40px;
 }
 
-/* Add margin to first group to clear sticky header visually if needed, though padding above handles most */
+/* Timeline Date Headers */
+.group-header {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 16px;
+    margin-top: 32px;
+    padding-left: 8px;
+    /* Align with grid gutter visual */
+    text-transform: capitalize;
+}
+
+/* Ensure the first header doesn't have excessive top margin if it's right under the sticky header */
 .date-group:first-child .group-header {
-    margin-top: 20px;
-    /* Force some gap from the sticky header */
+    margin-top: 16px;
 }
 
 /* Ensure sticky header has distinct separation */

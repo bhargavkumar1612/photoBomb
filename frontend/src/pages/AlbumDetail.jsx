@@ -2,14 +2,15 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Masonry from 'react-masonry-css'
-import { Plus, Share2 } from 'lucide-react'
+import { Plus, Share2, ArrowLeft } from 'lucide-react'
 import Lightbox from '../components/Lightbox'
 import PhotoPickerModal from '../components/PhotoPickerModal'
 import ShareModal from '../components/ShareModal'
 import PhotoItem from '../components/PhotoItem'
 import PhotoCardSkeleton from '../components/skeletons/PhotoCardSkeleton'
 import api from '../services/api'
-import './Timeline.css' // Reuse Timeline styles
+import './Timeline.css' // Reuse Timeline styles for Masonry/Grid
+import './AlbumDetail.css'
 
 export default function AlbumDetail() {
     const { albumId } = useParams()
@@ -102,7 +103,7 @@ export default function AlbumDetail() {
 
     if (isLoading) {
         return (
-            <div className="timeline-container">
+            <div className="timeline-container album-detail-container">
                 <div className="album-detail-header shim-header" style={{ marginBottom: 40 }}>
                     {/* Minimal header skeleton */}
                     <div className="skeleton-shimmer" style={{ width: 100, height: 20, marginBottom: 20 }}></div>
@@ -125,11 +126,12 @@ export default function AlbumDetail() {
     if (!album) return <div className="error">Album not found</div>
 
     return (
-        <div className="timeline-container">
+        <div className="timeline-container album-detail-container">
             {/* Header */}
             <div className="album-detail-header">
                 <button className="btn-back" onClick={() => navigate('/albums')}>
-                    ← Back to Albums
+                    <ArrowLeft size={18} />
+                    Back to Albums
                 </button>
                 <div className="album-detail-info">
                     <h1>{album.name}</h1>
@@ -137,7 +139,7 @@ export default function AlbumDetail() {
                     <span className="album-detail-count">{album.photo_count} photos</span>
                 </div>
                 <div className="album-detail-actions">
-                    <button className="btn-secondary" onClick={() => setIsShareModalOpen(true)} style={{ marginRight: '8px' }}>
+                    <button className="btn-secondary" onClick={() => setIsShareModalOpen(true)}>
                         <Share2 size={18} style={{ marginRight: 6 }} />
                         Share
                     </button>

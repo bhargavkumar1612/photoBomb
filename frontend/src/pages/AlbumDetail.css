@@ -1,0 +1,113 @@
+/* Album Detail Page Styles */
+
+.album-detail-container {
+    /* Inherits some behavior from timeline-container if reused, but focused here */
+    padding: 0;
+}
+
+.album-detail-header {
+    margin-bottom: 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* Back Button */
+.btn-back {
+    align-self: flex-start;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: transparent;
+    border: none;
+    padding: 8px 12px;
+    margin-left: -12px;
+    /* Visual alignment with left edge */
+    font-size: 14px;
+    font-weight: 500;
+    color: #6b7280;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.btn-back:hover {
+    background: #f3f4f6;
+    color: #111827;
+}
+
+/* Album Info (Title & Meta) */
+.album-detail-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.album-detail-info h1 {
+    font-size: 32px;
+    font-weight: 800;
+    color: #111827;
+    margin: 0;
+    line-height: 1.2;
+}
+
+.album-detail-info p {
+    font-size: 16px;
+    color: #4b5563;
+    margin: 0;
+    max-width: 600px;
+}
+
+.album-detail-count {
+    font-size: 14px;
+    color: #9ca3af;
+    font-weight: 500;
+    margin-top: 4px;
+}
+
+/* Actions Row */
+.album-detail-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #4f46e5;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+    font-size: 14px;
+}
+
+.btn-primary:hover {
+    background: #4338ca;
+}
+
+.btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: white;
+    color: #374151;
+    border: 1px solid #d1d5db;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 14px;
+}
+
+.btn-secondary:hover {
+    background: #f9fafb;
+    border-color: #9ca3af;
+}
