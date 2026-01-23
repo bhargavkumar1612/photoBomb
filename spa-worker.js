@@ -14,7 +14,7 @@ export default {
             // Check if it's a request for a static asset (based on extension)
             // We explicitly exclude these from the fallback to avoid "MIME type text/html" errors
             // for missing scripts or images.
-            const isStaticAsset = /\.(js|css|png|jpg|jpeg|gif|ico|json|svg|woff|woff2|ttf|map)$/i.test(pathname);
+            const isStaticAsset = /\.(js|css|png|jpg|jpeg|gif|ico|json|svg|woff|woff2|ttf|map|webmanifest)$/i.test(pathname);
 
             // Check if the client explicitly accepts HTML (standard for browser navigation)
             const acceptsHtml = request.headers.get('Accept')?.includes('text/html');
