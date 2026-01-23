@@ -108,7 +108,6 @@ class CallbackTask(Task):
 
 
 @celery_app.task(bind=True, base=CallbackTask, max_retries=3)
-@celery_app.task(bind=True, base=CallbackTask, max_retries=3)
 def process_upload(self, upload_id: str, photo_id: str):
     """
     Process uploaded photo: generate thumbnails, computed hashes, extract EXIF.
@@ -260,7 +259,10 @@ def process_upload(self, upload_id: str, photo_id: str):
                 # Update DB
                 photo.size_bytes = size_bytes
                 photo.sha256 = sha256
-                photo.phash = str(phash)
+                # Ensure phash is stored as signed 64-bit integer for Postgres BIGINT
+                if phash >= 2**63:
+                    phash -= 2**64
+                photo.phash = phash
                 
                 # Update taken_at if found in filename and not already set (EXIF would set it if implemented, but we aren't doing full EXIF here yet)
                 # TODO: Implement full EXIF extraction. For now, filename fallback is good.

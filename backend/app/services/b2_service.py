@@ -286,6 +286,36 @@ class B2Service:
         except B2Error:
             return None
 
+    def list_files(self, prefix: str, max_files: int = 1000):
+        """
+        List files in bucket with prefix.
+        
+        Args:
+            prefix: File prefix to filter by
+            max_files: Maximum number of files to return
+            
+        Returns:
+            List of file dicts
+        """
+        self.authorize()
+        bucket = self.get_bucket()
+        
+        files = []
+        # generator yields (file_version, folder_name)
+        # We use strict check on file_version to avoid duplicates if possible, 
+        # basically just want the names.
+        for file_version, _ in bucket.ls(folder_to_list=prefix, recursive=True):
+            files.append({
+                "file_name": file_version.file_name,
+                "file_id": file_version.id_,
+                "size": file_version.size,
+                "upload_timestamp": file_version.upload_timestamp
+            })
+            if len(files) >= max_files:
+                break
+                
+        return files
+
 
 # Singleton instance
 b2_service = B2Service()
