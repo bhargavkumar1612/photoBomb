@@ -4,15 +4,12 @@ Uses SQLAlchemy 2.0 async API.
 """
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
-from sqlalchemy.pool import NullPool
+
 from app.core.config import settings
-import uuid
 
-def _get_unique_stmt_name():
-    """Generate unique name for prepared statements to avoid pgbouncer collisions"""
-    return f"stmt_{uuid.uuid4().hex}"
 
-print("DEBUG: Configuring database with NullPool and custom statement naming")
+
+print("DEBUG: Configuring database with connection pooling enabled")
 
 # Create async engine
 # Force unique prepared statement names to bypass "already exists" errors
@@ -24,12 +21,13 @@ elif database_url and database_url.startswith("postgresql://"):
 
 engine = create_async_engine(
     database_url,
-    poolclass=NullPool,
     echo=settings.DEBUG,
     future=True,
+    pool_size=settings.DATABASE_POOL_SIZE,
+    max_overflow=settings.DATABASE_MAX_OVERFLOW,
+    pool_pre_ping=True,
     connect_args={
         "statement_cache_size": 0,
-        "prepared_statement_name_func": _get_unique_stmt_name,
     },
 )
 
