@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import HorizontalLoader from './HorizontalLoader'
-import { X, ChevronLeft, ChevronRight, Download, Calendar, HardDrive, FileType } from 'lucide-react'
+import { X, ChevronLeft, ChevronRight, Download, Calendar, HardDrive, FileType, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react'
+import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
 import './Lightbox.css'
 
 export default function Lightbox({ photo, photos, onClose, onNavigate }) {
@@ -103,50 +104,79 @@ export default function Lightbox({ photo, photos, onClose, onNavigate }) {
         <div className="lightbox-overlay" onClick={onClose} onMouseMove={resetControlsTimer}>
             <div className="lightbox-content" onClick={(e) => e.stopPropagation()}>
 
-                {/* Header Overlay */}
-                <div className={`lightbox-header ${showControls ? 'visible' : ''}`}>
-                    <div className="lightbox-title">
-                        <h3>{currentPhoto.filename}</h3>
-                        <p>{currentIndex + 1} of {photos.length}</p>
-                    </div>
-                    <button className="lightbox-close-btn" onClick={onClose}>
-                        <X size={24} />
-                    </button>
-                </div>
+                <TransformWrapper
+                    initialScale={1}
+                    minScale={0.5}
+                    maxScale={8}
+                    centerZoomedOut={true}
+                    limitToBounds={true}
+                    key={currentPhoto.photo_id} // Force reset on photo change
+                >
+                    {({ zoomIn, zoomOut, resetTransform }) => (
+                        <>
+                            {/* Header Overlay */}
+                            <div className={`lightbox-header ${showControls ? 'visible' : ''}`}>
+                                <div className="lightbox-title">
+                                    <h3>{currentPhoto.filename}</h3>
+                                    <p>{currentIndex + 1} of {photos.length}</p>
+                                </div>
+                                <div className="lightbox-controls-group">
+                                    <button className="lightbox-control-btn" onClick={() => zoomIn()}>
+                                        <ZoomIn size={20} />
+                                    </button>
+                                    <button className="lightbox-control-btn" onClick={() => zoomOut()}>
+                                        <ZoomOut size={20} />
+                                    </button>
+                                    <button className="lightbox-control-btn" onClick={() => resetTransform()}>
+                                        <RotateCcw size={20} />
+                                    </button>
+                                    <div className="lightbox-divider"></div>
+                                    <button className="lightbox-close-btn" onClick={onClose}>
+                                        <X size={24} />
+                                    </button>
+                                </div>
+                            </div>
 
-                <div className="lightbox-image-container">
-                    {loading && (
-                        <div className="lightbox-loader">
-                            <HorizontalLoader />
-                        </div>
+                            <div className="lightbox-image-container">
+                                {loading && (
+                                    <div className="lightbox-loader">
+                                        <HorizontalLoader />
+                                    </div>
+                                )}
+
+                                {currentIndex > 0 && (
+                                    <button
+                                        className={`lightbox-nav lightbox-prev ${showControls ? 'visible' : ''}`}
+                                        onClick={(e) => { e.stopPropagation(); onNavigate(photos[currentIndex - 1]) }}
+                                    >
+                                        <ChevronLeft size={40} />
+                                    </button>
+                                )}
+
+                                <TransformComponent
+                                    wrapperClass="lightbox-transform-wrapper"
+                                    contentClass="lightbox-transform-content"
+                                >
+                                    <img
+                                        src={currentPhoto.thumb_urls.original || `${apiBaseUrl}/photos/${currentPhoto.photo_id}/download`}
+                                        alt={currentPhoto.filename}
+                                        className={`lightbox-image ${loading ? 'loading' : 'loaded'}`}
+                                        onLoad={() => setLoading(false)}
+                                    />
+                                </TransformComponent>
+
+                                {currentIndex < photos.length - 1 && (
+                                    <button
+                                        className={`lightbox-nav lightbox-next ${showControls ? 'visible' : ''}`}
+                                        onClick={(e) => { e.stopPropagation(); onNavigate(photos[currentIndex + 1]) }}
+                                    >
+                                        <ChevronRight size={40} />
+                                    </button>
+                                )}
+                            </div>
+                        </>
                     )}
-
-                    {currentIndex > 0 && (
-                        <button
-                            className={`lightbox-nav lightbox-prev ${showControls ? 'visible' : ''}`}
-                            onClick={(e) => { e.stopPropagation(); onNavigate(photos[currentIndex - 1]) }}
-                        >
-                            <ChevronLeft size={40} />
-                        </button>
-                    )}
-
-                    <img
-                        key={currentPhoto.photo_id}
-                        src={currentPhoto.thumb_urls.original || `${apiBaseUrl}/photos/${currentPhoto.photo_id}/download`}
-                        alt={currentPhoto.filename}
-                        className={`lightbox-image ${loading ? 'loading' : 'loaded'}`}
-                        onLoad={() => setLoading(false)}
-                    />
-
-                    {currentIndex < photos.length - 1 && (
-                        <button
-                            className={`lightbox-nav lightbox-next ${showControls ? 'visible' : ''}`}
-                            onClick={(e) => { e.stopPropagation(); onNavigate(photos[currentIndex + 1]) }}
-                        >
-                            <ChevronRight size={40} />
-                        </button>
-                    )}
-                </div>
+                </TransformWrapper>
 
                 {/* Footer Metadata Overlay */}
                 <div className={`lightbox-footer ${showControls ? 'visible' : ''}`}>
