@@ -52,6 +52,9 @@ function App() {
                             <Route path="/settings" element={<Settings />} />
                             <Route path="/upload" element={<Upload />} />
                         </Route>
+
+                        {/* Catch all - redirect to home (which is protected, so will redirect to login if needed) */}
+                        <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
 
                     <UploadProgressWidget />
