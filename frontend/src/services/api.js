@@ -11,7 +11,8 @@ const api = axios.create({
 api.interceptors.request.use(
     (config) => {
         const token = localStorage.getItem('access_token')
-        if (token) {
+        // Skip auth for shared endpoints (public)
+        if (token && !config.url.includes('/shared/')) {
             config.headers.Authorization = `Bearer ${token}`
         }
         return config

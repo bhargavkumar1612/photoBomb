@@ -111,6 +111,10 @@ export default function Lightbox({ photo, photos, onClose, onNavigate }) {
                     centerZoomedOut={true}
                     limitToBounds={true}
                     key={currentPhoto.photo_id} // Force reset on photo change
+                    onPanning={resetControlsTimer}
+                    onZooming={resetControlsTimer}
+                    onPinching={resetControlsTimer}
+                    onWheel={resetControlsTimer}
                 >
                     {({ zoomIn, zoomOut, resetTransform }) => (
                         <>

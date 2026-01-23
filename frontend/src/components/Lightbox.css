@@ -36,7 +36,7 @@
     width: 100%;
     padding: 24px 32px;
     background: linear-gradient(180deg, rgba(0, 0, 0, 0.8) 0%, transparent 100%);
-    z-index: 20;
+    z-index: 50;
     display: flex;
     justify-content: space-between;
     align-items: flex-start;

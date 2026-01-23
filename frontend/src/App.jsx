@@ -27,12 +27,22 @@ function ProtectedRoute({ children }) {
 
 function PublicOnlyRoute({ children }) {
     const { user, loading } = useAuth()
+    const navigate = useNavigate()
+
+    useEffect(() => {
+        if (!loading && user) {
+            navigate('/', { replace: true })
+        }
+    }, [user, loading, navigate])
 
     if (loading) {
         return <div className="loading">Loading...</div>
     }
 
-    return user ? <Navigate to="/" replace /> : children
+    // While redirecting, return null to avoid flash
+    if (user) return null
+
+    return children
 }
 
 function App() {
