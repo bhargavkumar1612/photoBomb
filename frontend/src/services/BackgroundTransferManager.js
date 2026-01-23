@@ -53,6 +53,11 @@ class BackgroundTransferManager {
         }
 
         // Use Background Fetch for same-origin
+        // Safety check for Service Worker (it might be missing in non-secure contexts like LAN IP)
+        if (!('serviceWorker' in navigator)) {
+            return this.uploadWithFetch(files, apiBaseUrl)
+        }
+
         const registration = await navigator.serviceWorker.ready
         if (!registration.backgroundFetch) {
             // Fallback if Background Fetch not supported
@@ -94,6 +99,16 @@ class BackgroundTransferManager {
 
     async uploadWithFetch(files, apiBaseUrl) {
         const uploadId = `fetch-upload-${Date.now()}`
+
+        // Start processing in background (without awaiting) to unblock UI
+        this._processFetchUploads(uploadId, files, apiBaseUrl).catch(err => {
+            console.error('Background upload process failed:', err)
+        })
+
+        return { id: uploadId, results: [] }
+    }
+
+    async _processFetchUploads(uploadId, files, apiBaseUrl) {
         const token = localStorage.getItem('access_token')
         const results = []
 
@@ -141,7 +156,7 @@ class BackgroundTransferManager {
                     detail: { uploadId, filename: file.name, error: err.message }
                 }))
 
-                throw err
+                // Continue to next file instead of crashing entire batch
             }
         }
 

@@ -25,14 +25,32 @@ function ProtectedRoute({ children }) {
     return user ? children : <Navigate to="/login" />
 }
 
+function PublicOnlyRoute({ children }) {
+    const { user, loading } = useAuth()
+
+    if (loading) {
+        return <div className="loading">Loading...</div>
+    }
+
+    return user ? <Navigate to="/" replace /> : children
+}
+
 function App() {
     return (
         <AuthProvider>
             <SearchProvider>
                 <div className="app-container">
                     <Routes>
-                        <Route path="/login" element={<Login />} />
-                        <Route path="/register" element={<Register />} />
+                        <Route path="/login" element={
+                            <PublicOnlyRoute>
+                                <Login />
+                            </PublicOnlyRoute>
+                        } />
+                        <Route path="/register" element={
+                            <PublicOnlyRoute>
+                                <Register />
+                            </PublicOnlyRoute>
+                        } />
                         <Route path="/shared/:token" element={<SharedAlbumView />} />
 
                         <Route element={
