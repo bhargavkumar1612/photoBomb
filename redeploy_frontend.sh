@@ -9,6 +9,10 @@ cd frontend
 npm install
 
 echo "🛠️  Building Frontend..."
+# Sourcing .env manually to ensure variables are available
+if [ -f .env ]; then
+  export $(grep -v '^#' .env | xargs)
+fi
 npm run build
 
 # Verify critical files exist
