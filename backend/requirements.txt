@@ -1,20 +1,20 @@
 # --- FastAPI & Core ---
-fastapi==0.109.0
-uvicorn[standard]==0.27.0
-python-multipart==0.0.6
-pydantic==2.5.3
-pydantic-settings==2.1.0
-email-validator==2.1.0.post1
+fastapi==0.110.0
+uvicorn[standard]==0.29.0
+python-multipart==0.0.9
+pydantic==2.7.0
+pydantic-settings==2.2.1
+email-validator==2.1.1
 
 # --- Database ---
-sqlalchemy==2.0.25
-asyncpg==0.29.0
+sqlalchemy==2.0.29
+asyncpg==0.30.0
 alembic==1.13.1
 
 # --- PostgreSQL Extensions ---
 pgvector==0.2.4
 # Switched to source version for production (requires libpq-dev in Dockerfile)
-psycopg2==2.9.9
+psycopg2-binary==2.9.9
 
 # --- Authentication ---
 # Note: You generally only need pyjwt OR python-jose.
@@ -27,12 +27,13 @@ google-auth==2.27.0
 
 # --- Storage ---
 b2sdk==1.31.0
+aioboto3==13.0.0
 
 # --- Image Processing ---
 # Note: Requires libvips-dev installed in Docker
 pyvips==2.2.1
 imagehash==4.3.1
-pillow==10.2.0
+pillow==11.0.0
 
 # --- Task Queue ---
 celery==5.3.6

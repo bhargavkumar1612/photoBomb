@@ -29,11 +29,21 @@ class Settings(BaseSettings):
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 30
     
-    # Backblaze B2
-    B2_APPLICATION_KEY_ID: str
-    B2_APPLICATION_KEY: str
-    B2_BUCKET_NAME: str
-    B2_BUCKET_ID: str
+    # Storage Provider
+    STORAGE_PROVIDER: str = "b2_native"  # "b2_native" or "s3"
+
+    # Backblaze B2 (Legacy/Native)
+    B2_APPLICATION_KEY_ID: str = ""
+    B2_APPLICATION_KEY: str = ""
+    B2_BUCKET_NAME: str = ""
+    B2_BUCKET_ID: str = ""
+
+    # S3 Compatible (R2, AWS, MinIO)
+    S3_ENDPOINT_URL: str = ""
+    S3_ACCESS_KEY_ID: str = ""
+    S3_SECRET_ACCESS_KEY: str = ""
+    S3_BUCKET_NAME: str = ""
+    S3_REGION_NAME: str = "auto"
     
     # Storage
     DEFAULT_STORAGE_QUOTA_GB: int = 100

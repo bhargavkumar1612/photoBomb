@@ -16,7 +16,7 @@ from app.core.database import get_db
 from app.api.auth import get_current_user, get_current_user_id
 from app.models.user import User
 from app.models.photo import Photo, PhotoFile
-from app.services.b2_service import b2_service
+from app.services.storage_factory import get_storage_service
 from app.core.config import settings
 
 router = APIRouter()
@@ -26,41 +26,35 @@ router = APIRouter()
 @router.get("/{photo_id}/download")
 async def download_photo(
     photo_id: str,
-    filename: Optional[str] = Query(None),
     current_user_id: uuid.UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Download original photo file (stateless redirect to B2).
-    If filename is provided, avoids DB lookup entirely.
+    Download original photo file.
+    Redirects to signed URL from appropriate provider (B2 or S3).
     """
-    
-    if filename:
-        # STATELESS MODE: Fastest
-        b2_key = f"uploads/{current_user_id}/{photo_id}/original/{filename}"
-    else:
-        # FALLBACK MODE: Fetch from DB to get filename
-        result = await db.execute(
-            select(Photo).where(
-                Photo.photo_id == photo_id,
-                Photo.user_id == current_user_id,
-                Photo.deleted_at == None
-            )
+    result = await db.execute(
+        select(Photo).where(
+            Photo.photo_id == photo_id,
+            Photo.user_id == current_user_id,
+            Photo.deleted_at == None
         )
-        photo = result.scalar_one_or_none()
-        
-        if not photo:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Photo not found"
-            )
-        b2_key = f"uploads/{current_user_id}/{photo.photo_id}/original/{photo.filename}"
+    )
+    photo = result.scalar_one_or_none()
+    
+    if not photo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Photo not found"
+        )
+    
+    storage = get_storage_service(photo.storage_provider)
+    b2_key = f"uploads/{current_user_id}/{photo.photo_id}/original/{photo.filename}"
     
     # Generate presigned download URL
-    # URL valid for 1 hour
-    download_url = b2_service.generate_presigned_download_url(b2_key, expires_in=3600)
+    download_url = storage.generate_presigned_url(b2_key, expires_in=3600)
     
-    # Redirect client to B2 directly
+    # Redirect client
     return Response(
         status_code=status.HTTP_307_TEMPORARY_REDIRECT,
         headers={"Location": download_url}
@@ -71,21 +65,36 @@ async def download_photo(
 async def get_thumbnail(
     photo_id: str,
     size: int,
-    current_user_id: uuid.UUID = Depends(get_current_user_id)
+    current_user_id: uuid.UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
 ):
-    """Get photo thumbnail (stateless redirect to B2)."""
+    """Get photo thumbnail."""
     # Validate size
     if size not in [256, 512, 1024]:
         size = 512
+        
+    result = await db.execute(
+        select(Photo).where(
+            Photo.photo_id == photo_id,
+            Photo.user_id == current_user_id,
+            Photo.deleted_at == None
+        )
+    )
+    photo = result.scalar_one_or_none()
     
-    # Define cache key
+    if not photo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Photo not found"
+        )
+    
+    storage = get_storage_service(photo.storage_provider)
     thumb_key = f"uploads/{current_user_id}/{photo_id}/thumbnails/thumb_{size}.jpg"
     
     # Generate presigned URL
-    # URL valid for 1 hour
-    thumb_url = b2_service.generate_presigned_download_url(thumb_key, expires_in=3600)
+    thumb_url = storage.generate_presigned_url(thumb_key, expires_in=3600)
     
-    # Redirect client to B2 directly
+    # Redirect client
     return Response(
         status_code=status.HTTP_307_TEMPORARY_REDIRECT,
         headers={"Location": thumb_url}
@@ -137,7 +146,8 @@ async def list_photos(
     # Build query
     query = select(Photo).where(
         Photo.user_id == current_user.user_id,
-        Photo.deleted_at == None
+        Photo.deleted_at == None,
+        Photo.storage_provider == settings.STORAGE_PROVIDER
     )
     
     # Apply sorting
@@ -160,31 +170,27 @@ async def list_photos(
     if has_more:
         photos = photos[:limit]
     
-    # Generate B2 Authorization for the entire user folder
-    # This avoids signing each URL individually and allows batch access
-    user_prefix = f"uploads/{current_user.user_id}/"
-    auth_token = b2_service.get_download_authorization(user_prefix, valid_duration=86400) # 24 hours
-    download_base = b2_service.get_download_url_base()
-    bucket_name = settings.B2_BUCKET_NAME # Or fetch from b2_service.get_bucket().name but config saves a call
-
+    # Generate presigned/authorized URL for download
     
-    # Helper to sign URL
-    def sign_b2_url(key: str) -> str:
-        return f"{download_base}/file/{bucket_name}/{key}?Authorization={auth_token}"
-
     # Build response
     photo_responses = []
+    
+    # Strict mode: We only show photos for the current provider, so we use that provider's service.
+    storage = get_storage_service(settings.STORAGE_PROVIDER)
+    
     for photo in photos:
-        # Construct full B2 keys
+        # storage = get_storage_service(photo.storage_provider) # Removed per strict isolation request
+        
+        # Construct full keys
         key_base = f"uploads/{current_user.user_id}/{photo.photo_id}"
         
         # Generate generic thumbnail URLs (signed)
         thumb_urls = {
-            "thumb_256": sign_b2_url(f"{key_base}/thumbnails/thumb_256.jpg"),
-            "thumb_512": sign_b2_url(f"{key_base}/thumbnails/thumb_512.jpg"),
-            "thumb_1024": sign_b2_url(f"{key_base}/thumbnails/thumb_1024.jpg"),
+            "thumb_256": storage.generate_presigned_url(f"{key_base}/thumbnails/thumb_256.jpg", expires_in=3600),
+            "thumb_512": storage.generate_presigned_url(f"{key_base}/thumbnails/thumb_512.jpg", expires_in=3600),
+            "thumb_1024": storage.generate_presigned_url(f"{key_base}/thumbnails/thumb_1024.jpg", expires_in=3600),
             # Also provide the original download URL here for convenience
-             "original": sign_b2_url(f"{key_base}/original/{photo.filename}")
+             "original": storage.generate_presigned_url(f"{key_base}/original/{photo.filename}", expires_in=3600)
         }
         
         # We can add a "download_url" field to PhotoResponse if we want, 
@@ -239,22 +245,16 @@ async def get_photo(
             detail="Photo not found"
         )
     
-    # Generate B2 Authorization
-    user_prefix = f"uploads/{current_user.user_id}/"
-    auth_token = b2_service.get_download_authorization(user_prefix, valid_duration=86400)
-    download_base = b2_service.get_download_url_base()
-    bucket_name = settings.B2_BUCKET_NAME
-    
-    def sign_b2_url(key: str) -> str:
-        return f"{download_base}/file/{bucket_name}/{key}?Authorization={auth_token}"
+    # Strict isolation
+    storage = get_storage_service(settings.STORAGE_PROVIDER)
     
     # Generate thumbnail URLs
     key_base = f"uploads/{current_user.user_id}/{photo.photo_id}"
     thumb_urls = {
-        "thumb_256": sign_b2_url(f"{key_base}/thumbnails/thumb_256.jpg"),
-        "thumb_512": sign_b2_url(f"{key_base}/thumbnails/thumb_512.jpg"),
-        "thumb_1024": sign_b2_url(f"{key_base}/thumbnails/thumb_1024.jpg"),
-        "original": sign_b2_url(f"{key_base}/original/{photo.filename}")
+        "thumb_256": storage.generate_presigned_url(f"{key_base}/thumbnails/thumb_256.jpg", expires_in=3600),
+        "thumb_512": storage.generate_presigned_url(f"{key_base}/thumbnails/thumb_512.jpg", expires_in=3600),
+        "thumb_1024": storage.generate_presigned_url(f"{key_base}/thumbnails/thumb_1024.jpg", expires_in=3600),
+        "original": storage.generate_presigned_url(f"{key_base}/original/{photo.filename}", expires_in=3600)
     }
     
     return PhotoResponse(
@@ -414,14 +414,7 @@ async def get_trash(
     if has_more:
         photos = photos[:limit]
     
-    # Generate B2 Authorization
-    user_prefix = f"uploads/{current_user.user_id}/"
-    auth_token = b2_service.get_download_authorization(user_prefix, valid_duration=86400)
-    download_base = b2_service.get_download_url_base()
-    bucket_name = settings.B2_BUCKET_NAME
-    
-    def sign_b2_url(key: str) -> str:
-        return f"{download_base}/file/{bucket_name}/{key}?Authorization={auth_token}"
+    storage = get_storage_service()
 
     # Build response
     photo_responses = []
@@ -429,10 +422,10 @@ async def get_trash(
         key_base = f"uploads/{current_user.user_id}/{photo.photo_id}"
         
         thumb_urls = {
-            "thumb_256": sign_b2_url(f"{key_base}/thumbnails/thumb_256.jpg"),
-            "thumb_512": sign_b2_url(f"{key_base}/thumbnails/thumb_512.jpg"),
-            "thumb_1024": sign_b2_url(f"{key_base}/thumbnails/thumb_1024.jpg"),
-            "original": sign_b2_url(f"{key_base}/original/{photo.filename}")
+            "thumb_256": storage.generate_presigned_url(f"{key_base}/thumbnails/thumb_256.jpg", expires_in=3600),
+            "thumb_512": storage.generate_presigned_url(f"{key_base}/thumbnails/thumb_512.jpg", expires_in=3600),
+            "thumb_1024": storage.generate_presigned_url(f"{key_base}/thumbnails/thumb_1024.jpg", expires_in=3600),
+            "original": storage.generate_presigned_url(f"{key_base}/original/{photo.filename}", expires_in=3600)
         }
         
         photo_responses.append(PhotoResponse(
@@ -507,43 +500,18 @@ async def permanently_delete_photo(
             detail="Photo not found"
         )
     
-    # Delete from B2
-    b2_key = f"uploads/{current_user.user_id}/{photo.photo_id}/original/{photo.filename}"
+    # Delete from Storage
+    storage = get_storage_service(photo.storage_provider)
     try:
-        # Get file info to get file_id for deletion
-        # TODO: Refactor B2 service to expose delete_by_name or similar cleanly
-        import requests
-        # We need to list filenames to get the ID or handle this in b2_service
-        # For now, we'll try best effort with b2_service methods if available, or direct API
-        
-        # Simplified approach: Just clear the DB record if B2 fails, but B2 is critical for storage
-        # Ideally b2_service should handle this. Let's try to list versions and delete.
-        bucket = b2_service.get_bucket()
-        
-        # List versions of the file to get ID
-        for file_version in bucket.ls(folder_to_list=f"uploads/{current_user.user_id}/{photo.photo_id}"):
-             # Tuple (file_version_info, folder_name) or similar depending on library version
-             # b2sdk ls returns generator of (file_version, folder)
-             
-             # Actually, simpler to just assume key structure and iterate
-             # If using b2sdk, we can hide_file (soft delete in B2) or delete_file_version
-             pass
-             
-        # Direct deletion logic from previous implementation was trying to use requests which is hacky
-        # Use b2sdk properly if possible, or fallback to the previous logic which seemed to work for verified delete
-        
-        # Use a more robust B2 delete: hide it first (simpler) or iterate versions?
-        # B2 'hide_file' creates a hidden marker. 'delete_file_version' removes it.
-        # We want to remove all versions.
-        
-        # Iterating versions to delete all
-        # b2_service.bucket is a b2sdk.v2.Bucket object
-        file_versions = bucket.ls(f"uploads/{current_user.user_id}/{photo.photo_id}", recursive=True)
-        for file_version, _ in file_versions:
-            file_version.delete()
+        # List and delete all files (original + thumbnails)
+        prefix = f"uploads/{current_user.user_id}/{photo.photo_id}"
+        files = storage.list_files(prefix=prefix)
+        for f in files:
+            # delete_file expects 'key' (file_name)
+            storage.delete_file(f['file_name'])
             
     except Exception as e:
-        print(f"Warning: Failed to delete file from B2: {str(e)}")
+        print(f"Warning: Failed to delete file from Storage: {str(e)}")
         # Proceed to DB delete anyway to free up quota in our system
     
     # Hard delete from database

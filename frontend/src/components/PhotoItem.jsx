@@ -17,6 +17,7 @@ export default function PhotoItem({
     onAddToAlbum
 }) {
     const [imageLoaded, setImageLoaded] = useState(false)
+    const [hasError, setHasError] = useState(false)
     const token = localStorage.getItem('access_token')
 
     return (
@@ -31,31 +32,60 @@ export default function PhotoItem({
             )}
 
             <div className="photo-mediabox" style={{ minHeight: imageLoaded ? 'auto' : '200px', position: 'relative' }}>
-                {!imageLoaded && (
+                {!imageLoaded && !hasError && (
                     <div className="photo-loader" style={{ position: 'absolute', inset: 0, zIndex: 1 }}>
                         <HorizontalLoader />
                     </div>
                 )}
 
-                <img
-                    src={photo.thumb_urls.thumb_512}
-                    alt={photo.filename}
-                    loading="lazy"
-                    onClick={() => !selectionMode && onLightbox(photo)}
-                    style={{
-                        cursor: selectionMode ? 'default' : 'pointer',
-                        opacity: imageLoaded ? 1 : 0,
-                        transition: 'opacity 0.3s ease'
-                    }}
-                    onLoad={() => setImageLoaded(true)}
-                    onError={(e) => {
-                        // Fallback to original image if thumbnail fails
-                        if (photo.thumb_urls.original) {
-                            e.target.src = photo.thumb_urls.original
-                        }
-                        setImageLoaded(true)
-                    }}
-                />
+                {hasError ? (
+                    <div
+                        className="photo-error-placeholder"
+                        style={{
+                            width: '100%',
+                            height: '100%',
+                            minHeight: '200px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            background: '#f3f4f6',
+                            color: '#6b7280',
+                            borderRadius: '8px',
+                            textAlign: 'center',
+                            padding: '1rem'
+                        }}
+                    >
+                        <Info size={32} style={{ marginBottom: '8px', opacity: 0.5 }} />
+                        <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>Image Migrating</span>
+                        <span style={{ fontSize: '0.75rem', opacity: 0.75 }}>Check back later</span>
+                    </div>
+                ) : (
+                    <img
+                        src={photo.thumb_urls.thumb_512}
+                        alt={photo.filename}
+                        loading="lazy"
+                        onClick={() => !selectionMode && onLightbox(photo)}
+                        style={{
+                            cursor: selectionMode ? 'default' : 'pointer',
+                            opacity: imageLoaded ? 1 : 0,
+                            transition: 'opacity 0.3s ease',
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover'
+                        }}
+                        onLoad={() => setImageLoaded(true)}
+                        onError={(e) => {
+                            // Try original if thumbnail fails, but prevent infinite loop if original also fails
+                            if (e.target.src !== photo.thumb_urls.original && photo.thumb_urls.original) {
+                                e.target.src = photo.thumb_urls.original
+                            } else {
+                                setHasError(true)
+                                setImageLoaded(true)
+                            }
+                        }}
+                    />
+                )}
             </div>
 
             {!selectionMode && (

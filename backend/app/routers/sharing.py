@@ -12,7 +12,7 @@ from app.models.album import Album
 from app.models.photo import Photo
 from app.models.share_link import ShareLink
 from app.schemas.sharing import ShareLinkCreate, ShareLinkResponse, SharedAlbumView
-from app.services.b2_service import b2_service
+from app.services.storage_factory import get_storage_service
 from app.core.config import settings
 
 router = APIRouter()
@@ -133,21 +133,11 @@ async def view_shared_album(
         owner_name = owner.full_name
         owner_user_id = owner.user_id
 
-    # Generate B2 Authorization for the album owner's folder
-    # This allows batch access with a single upstream API call
-    user_prefix = f"uploads/{owner_user_id}/"
-    try:
-        auth_token = b2_service.get_download_authorization(user_prefix, valid_duration=86400)
-    except Exception as e:
-        print(f"Failed to get B2 auth: {e}")
-        # Fallback or error? specific error helps debugging
-        raise HTTPException(status_code=500, detail="Storage authorization failed")
-
-    download_base = b2_service.get_download_url_base()
-    bucket_name = settings.B2_BUCKET_NAME
+    # Generate Signed URLs
+    storage = get_storage_service()
     
     def sign_b2_url(key: str) -> str:
-        return f"{download_base}/file/{bucket_name}/{key}?Authorization={auth_token}"
+        return storage.generate_presigned_url(key, expires_in=86400)
 
     # Process photos with Signed URLs
     photo_list = []

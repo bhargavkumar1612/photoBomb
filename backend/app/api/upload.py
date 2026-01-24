@@ -13,7 +13,8 @@ from app.core.database import get_db
 from app.api.auth import get_current_user
 from app.models.user import User
 from app.models.photo import Photo
-from app.services.b2_service import b2_service
+from app.services.storage_factory import get_storage_service
+from app.core.config import settings
 from app.celery_app import celery_app
 
 router = APIRouter()
@@ -77,11 +78,15 @@ async def presign_upload(
         )
     
     # Check for duplicate based on SHA256
+    # Allow duplicate if it's on a different storage provider (migration scenario)
+    current_provider = settings.STORAGE_PROVIDER
+    
     result = await db.execute(
         select(Photo).where(
             Photo.user_id == current_user.user_id,
             Photo.sha256 == request.sha256,
-            Photo.deleted_at == None
+            Photo.deleted_at == None,
+            Photo.storage_provider == current_provider 
         )
     )
     existing_photo = result.scalar_one_or_none()
@@ -92,16 +97,17 @@ async def presign_upload(
             detail={
                 "error": "duplicate",
                 "photo_id": str(existing_photo.photo_id),
-                "message": f"This photo was already uploaded on {existing_photo.uploaded_at.strftime('%Y-%m-%d')}"
+                "message": f"This photo was already uploaded to {current_provider} on {existing_photo.uploaded_at.strftime('%Y-%m-%d')}"
             }
         )
     
     # Generate upload_id
     upload_id = str(uuid.uuid4())
     
-    # Get presigned URL from B2
+    # Get presigned URL from Storage Provider
     try:
-        presign_data = b2_service.generate_presigned_upload_url(
+        storage = get_storage_service()
+        presign_data = storage.generate_presigned_upload_url(
             filename=request.filename,
             user_id=str(current_user.user_id),
             upload_id=upload_id
@@ -147,7 +153,8 @@ async def confirm_upload(
         mime_type="image/jpeg",
         size_bytes=0,  # Will be updated
         sha256="",  # Will be updated
-        uploaded_at=datetime.utcnow()
+        uploaded_at=datetime.utcnow(),
+        storage_provider=settings.STORAGE_PROVIDER
     )
     
     db.add(photo)
@@ -176,44 +183,61 @@ async def direct_upload(
    Direct upload through backend (bypasses CORS).
     Backend receives file and uploads to B2.
     """
+    from starlette.concurrency import run_in_threadpool
     import hashlib
     import tempfile
     import os
     from datetime import datetime
     
-    # Read file content
+    # Read file content (already async)
     file_content = await file.read()
     
-    # Compute SHA256
-    sha256_hash = hashlib.sha256(file_content).hexdigest()
+    # 1. Blocking: Compute SHA256 and Write Temp File
+    def _save_temp_and_hash():
+        sha256 = hashlib.sha256(file_content).hexdigest()
+        
+        # Save to temp file
+        temp_file = tempfile.NamedTemporaryFile(delete=False)
+        temp_file.write(file_content)
+        temp_path = temp_file.name
+        temp_file.close() # Close handle so others can read
+        
+        return sha256, temp_path
+
+    sha256_hash, temp_path = await run_in_threadpool(_save_temp_and_hash)
     
     # Check for duplicates
+    # Allow duplicate if different provider (migration)
+    current_provider = settings.STORAGE_PROVIDER
+    
     result = await db.execute(
         select(Photo).where(
             Photo.user_id == current_user.user_id,
             Photo.sha256 == sha256_hash,
-            Photo.deleted_at == None
+            Photo.deleted_at == None,
+            Photo.storage_provider == current_provider
         )
     )
     existing_photo = result.scalar_one_or_none()
     
     if existing_photo:
+        # Cleanup temp file if duplicate
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
+            
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"This photo was already uploaded on {existing_photo.uploaded_at.strftime('%Y-%m-%d')}"
+            detail=f"This photo was already uploaded to {current_provider} on {existing_photo.uploaded_at.strftime('%Y-%m-%d')}"
         )
     
     # Check quota
     if len(file_content) > current_user.storage_quota_bytes - current_user.storage_used_bytes:
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail=f"Storage quota exceeded"
         )
-    
-    # Save to temp file
-    with tempfile.NamedTemporaryFile(delete=False) as temp_file:
-        temp_file.write(file_content)
-        temp_path = temp_file.name
     
     # Detect MIME type from filename if content_type is unreliable
     import mimetypes
@@ -245,7 +269,8 @@ async def direct_upload(
             mime_type=detected_mime_type,
             size_bytes=len(file_content),
             sha256=sha256_hash,
-            uploaded_at=datetime.utcnow()
+            uploaded_at=datetime.utcnow(),
+            storage_provider=settings.STORAGE_PROVIDER
         )
         
         db.add(photo)
@@ -256,11 +281,19 @@ async def direct_upload(
         b2_key = f"uploads/{current_user.user_id}/{photo.photo_id}/original/{file.filename}"
         
         try:
-            b2_result = b2_service.upload_file(
-                local_path=temp_path,
-                b2_key=b2_key,
-                content_type=file.content_type or "application/octet-stream"
-            )
+            storage = get_storage_service()
+            
+            # 2. Blocking: Network Upload
+            def _upload_to_storage():
+                # If storage supports upload_file (local path)
+                storage.upload_file(
+                    local_path=temp_path,
+                    key=b2_key,
+                    content_type=file.content_type or "application/octet-stream"
+                )
+            
+            await run_in_threadpool(_upload_to_storage)
+            
         except Exception as b2_error:
             # B2 upload failed - rollback the DB record
             await db.delete(photo)
@@ -298,9 +331,6 @@ async def direct_upload(
         if os.path.exists(temp_path):
             os.unlink(temp_path)
 
-        if os.path.exists(temp_path):
-            os.unlink(temp_path)
-
 
 @router.delete("/cleanup/orphaned")
 async def cleanup_orphaned_photos(
@@ -328,7 +358,8 @@ async def cleanup_orphaned_photos(
         
         try:
             # Try to download first few bytes to verify file exists
-            file_bytes = b2_service.download_file_bytes(b2_key)
+            storage = get_storage_service()
+            file_bytes = storage.download_file_bytes(b2_key)
             # File exists, not orphaned
         except Exception as e:
             # File doesn't exist or error - likely orphaned

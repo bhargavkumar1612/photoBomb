@@ -58,11 +58,12 @@ class BackgroundTransferManager {
             return this.uploadWithFetch(files, apiBaseUrl)
         }
 
-        const registration = await navigator.serviceWorker.ready
-        if (!registration.backgroundFetch) {
-            // Fallback if Background Fetch not supported
-            return this.uploadWithFetch(files, apiBaseUrl)
-        }
+        // Forcing fallback to regular fetch to debug R2 upload issues
+        // const registration = await navigator.serviceWorker.ready
+        // if (!registration.backgroundFetch) {
+        //     return this.uploadWithFetch(files, apiBaseUrl)
+        // }
+        return this.uploadWithFetch(files, apiBaseUrl)
 
         const uploadId = `upload-${Date.now()}`
         const requests = files.map(file => {

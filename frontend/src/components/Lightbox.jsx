@@ -7,6 +7,7 @@ import './Lightbox.css'
 export default function Lightbox({ photo, photos, onClose, onNavigate }) {
     const [currentIndex, setCurrentIndex] = useState(0)
     const [loading, setLoading] = useState(true)
+    const [hasError, setHasError] = useState(false)
     const [showControls, setShowControls] = useState(true)
     const controlsTimeoutRef = useRef(null)
 
@@ -19,9 +20,10 @@ export default function Lightbox({ photo, photos, onClose, onNavigate }) {
         }
     }, [photo?.photo_id])
 
-    // Reset loading state when photo changes
+    // Reset loading/error state when photo changes
     useEffect(() => {
         setLoading(true)
+        setHasError(false)
     }, [currentIndex])
 
     // Pre-cache surrounding images (+/- 5)
@@ -164,12 +166,31 @@ export default function Lightbox({ photo, photos, onClose, onNavigate }) {
                                     wrapperClass="lightbox-transform-wrapper"
                                     contentClass="lightbox-transform-content"
                                 >
-                                    <img
-                                        src={currentPhoto.thumb_urls.original || `${apiBaseUrl}/photos/${currentPhoto.photo_id}/download`}
-                                        alt={currentPhoto.filename}
-                                        className={`lightbox-image ${loading ? 'loading' : 'loaded'}`}
-                                        onLoad={() => setLoading(false)}
-                                    />
+                                    {hasError ? (
+                                        <div className="lightbox-error-placeholder" style={{
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            color: 'white',
+                                            opacity: 0.8
+                                        }}>
+                                            <Info size={48} style={{ marginBottom: '16px' }} />
+                                            <h3 style={{ margin: 0, marginBottom: '8px' }}>Image Unavailable</h3>
+                                            <p style={{ margin: 0, opacity: 0.7 }}>Migration in progress or file missing</p>
+                                        </div>
+                                    ) : (
+                                        <img
+                                            src={currentPhoto.thumb_urls.original || `${apiBaseUrl}/photos/${currentPhoto.photo_id}/download`}
+                                            alt={currentPhoto.filename}
+                                            className={`lightbox-image ${loading ? 'loading' : 'loaded'}`}
+                                            onLoad={() => setLoading(false)}
+                                            onError={() => {
+                                                setLoading(false)
+                                                setHasError(true)
+                                            }}
+                                        />
+                                    )}
                                 </TransformComponent>
 
                                 {currentIndex < photos.length - 1 && (

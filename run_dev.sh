@@ -10,6 +10,9 @@ cleanup() {
     if [ -n "$FE_PID" ]; then
         kill $FE_PID 2>/dev/null
     fi
+    if [ -n "$WORKER_PID" ]; then
+        kill $WORKER_PID 2>/dev/null
+    fi
     exit
 }
 
@@ -21,13 +24,15 @@ echo "🚀 Starting PhotoBomb Development Environment..."
 # Check if port 8000 is free (Backend)
 if lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null ; then
     echo "⚠️  Port 8000 is busy. Please free it first."
-    exit 1
+    kill $(lsof -ti:8000)
+    # exit 1
 fi
 
 # Check if port 3000 is free (Frontend)
 if lsof -Pi :3000 -sTCP:LISTEN -t >/dev/null ; then
     echo "⚠️  Port 3000 is busy. Please free it first."
-    exit 1
+    kill $(lsof -ti:3000)
+    # exit 1
 fi
 
 # Start Backend
@@ -39,6 +44,13 @@ if [ -d "venv" ]; then
 fi
 uvicorn app.main:app --reload --port 8000 &
 BE_PID=$!
+cd ..
+ 
+# Start Celery Worker
+echo "👷 Starting Celery Worker..."
+cd backend
+celery -A app.celery_app worker --loglevel=info -Q high,low,celery &
+WORKER_PID=$!
 cd ..
 
 # Start Frontend

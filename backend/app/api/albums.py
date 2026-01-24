@@ -13,7 +13,7 @@ from app.api.auth import get_current_user
 from app.models.user import User
 from app.models.album import Album, album_photos
 from app.models.photo import Photo
-from app.services.b2_service import b2_service
+from app.services.storage_factory import get_storage_service
 from app.core.config import settings
 
 router = APIRouter()
@@ -88,12 +88,9 @@ async def create_album(
     # Generate URL if cover photo exists
     cover_url = None
     if new_album.cover_photo_id:
-        user_prefix = f"uploads/{current_user.user_id}/"
-        auth_token = b2_service.get_download_authorization(user_prefix)
-        download_base = b2_service.get_download_url_base()
-        bucket_name = settings.B2_BUCKET_NAME
-        key = f"{user_prefix}{new_album.cover_photo_id}/thumbnails/thumb_512.jpg"
-        cover_url = f"{download_base}/file/{bucket_name}/{key}?Authorization={auth_token}"
+        storage = get_storage_service()
+        key = f"uploads/{current_user.user_id}/{new_album.cover_photo_id}/thumbnails/thumb_512.jpg"
+        cover_url = storage.generate_presigned_url(key)
 
     return AlbumResponse(
         album_id=str(new_album.album_id),
@@ -164,15 +161,14 @@ async def list_albums(
     for row in thumb_result.all():
         thumbs_map[row[0]].append(str(row[1]))
     
-    # Generate B2 Token for Signing
-    user_prefix = f"uploads/{current_user.user_id}/"
-    auth_token = b2_service.get_download_authorization(user_prefix, valid_duration=86400)
-    download_base = b2_service.get_download_url_base()
-    bucket_name = settings.B2_BUCKET_NAME
+    from app.services.storage_factory import get_storage_service
+
+    # Generate Signed URLs
+    storage = get_storage_service()
     
     def sign_thumb(photo_id, size=512):
-         key = f"{user_prefix}{photo_id}/thumbnails/thumb_{size}.jpg"
-         return f"{download_base}/file/{bucket_name}/{key}?Authorization={auth_token}"
+         key = f"uploads/{current_user.user_id}/{photo_id}/thumbnails/thumb_{size}.jpg"
+         return storage.generate_presigned_url(key, expires_in=86400)
 
     # 4. Assemble response
     album_responses = []
@@ -241,14 +237,11 @@ async def get_album(
     )
     photos = photos_result.scalars().all()
     
-    # Generate B2 Token
-    user_prefix = f"uploads/{current_user.user_id}/"
-    auth_token = b2_service.get_download_authorization(user_prefix, valid_duration=86400)
-    download_base = b2_service.get_download_url_base()
-    bucket_name = settings.B2_BUCKET_NAME
+    # Generate Signed URLs
+    storage = get_storage_service()
     
     def sign_b2_url(key: str) -> str:
-        return f"{download_base}/file/{bucket_name}/{key}?Authorization={auth_token}"
+        return storage.generate_presigned_url(key, expires_in=86400)
 
     photos_data = []
     for p in photos:

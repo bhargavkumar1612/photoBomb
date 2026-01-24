@@ -23,6 +23,10 @@ class Photo(Base):
     mime_type = Column(String(100), nullable=False)
     size_bytes = Column(BigInteger, nullable=False)
     
+    # Storage Location
+    # 'b2_native' (Legacy) or 's3' (R2/AWS)
+    storage_provider = Column(String(20), default='b2_native', nullable=False)
+    
     # Deduplication
     sha256 = Column(String(64), nullable=False, index=True)
     phash = Column(BigInteger, nullable=True, index=True)  # Perceptual hash
