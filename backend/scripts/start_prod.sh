@@ -3,6 +3,8 @@ set -e
 
 # 1. Run Migrations
 echo "📦 Running Database Migrations..."
+echo "🔍 Debug: Listing migration files:"
+ls -l alembic/versions/
 alembic upgrade head
 
 # 2. Start Celery Worker (Background)
