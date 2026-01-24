@@ -20,7 +20,7 @@ export default {
             const acceptsHtml = request.headers.get('Accept')?.includes('text/html');
 
             // Fallback to index.html ONLY for navigation requests that aren't API calls or static assets
-            if (!isStaticAsset && !pathname.startsWith('/api/') && acceptsHtml) {
+            if (!isStaticAsset && !pathname.startsWith('/api/') && !pathname.startsWith('/assets/') && acceptsHtml) {
                 return env.ASSETS.fetch(new URL('/index.html', request.url));
             }
         }
