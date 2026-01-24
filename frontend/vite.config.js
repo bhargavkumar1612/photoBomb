@@ -33,7 +33,7 @@ export default defineConfig({
         ]
       },
       devOptions: {
-        enabled: true,
+        enabled: false,
         type: 'module'
       }
     })
@@ -45,6 +45,9 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true
       }
+    },
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin-allow-popups'
     }
   },
   resolve: {
