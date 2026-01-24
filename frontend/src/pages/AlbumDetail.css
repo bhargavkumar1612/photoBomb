@@ -18,14 +18,14 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    background: transparent;
-    border: none;
+    border: 1px solid #d1d5db;
+    background: white;
     padding: 8px 12px;
-    margin-left: -12px;
+    margin-left: 0;
     /* Visual alignment with left edge */
     font-size: 14px;
     font-weight: 500;
-    color: #6b7280;
+    color: #374151;
     cursor: pointer;
     border-radius: 8px;
     transition: all 0.2s ease;

@@ -198,13 +198,13 @@
 /* Masonry Grid Styles */
 .my-masonry-grid {
     display: flex;
-    margin-left: -20px;
+    margin-left: -16px;
     /* gutter size offset */
     width: auto;
 }
 
 .my-masonry-grid_column {
-    padding-left: 20px;
+    padding-left: 16px;
     /* gutter size */
     background-clip: padding-box;
 }
@@ -217,7 +217,7 @@
     background-color: #f3f4f6;
     transform: translateZ(0);
     transition: transform 0.2s;
-    margin-bottom: 20px;
+    margin-bottom: 16px;
     /* Vertical gutter */
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
