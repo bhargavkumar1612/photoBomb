@@ -6,7 +6,7 @@ import { GoogleOAuthProvider } from '@react-oauth/google'
 import App from './App'
 import './index.css'
 
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
+const GOOGLE_CLIENT_ID = "416607458916-2arj516g6ntk59ahmhuajin6ts7svs11.apps.googleusercontent.com"
 
 // React Query client
 const queryClient = new QueryClient({
