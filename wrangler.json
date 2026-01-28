@@ -1,9 +1,10 @@
 {
   "name": "photobomb-frontend",
-  "compatibility_date": "2024-01-09",
+  "compatibility_date": "2024-09-23",
   "main": "spa-worker.js",
   "assets": {
-    "directory": "./frontend/dist"
+    "directory": "./frontend/dist",
+    "binding": "ASSETS"
   },
   "observability": {
     "enabled": true

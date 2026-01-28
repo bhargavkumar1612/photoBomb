@@ -6,10 +6,17 @@ export default {
             // Try to serve the request as a static asset first
             // usage of env.ASSETS requires the "assets" binding in wrangler.json
             if (!env.ASSETS) {
-                throw new Error("env.ASSETS is undefined. Check wrangler.json configuration.");
+                console.log("Environment keys:", Object.keys(env));
+                throw new Error(`env.ASSETS is undefined. Available keys: ${JSON.stringify(Object.keys(env))}. Config issue?`);
             }
 
             let response = await env.ASSETS.fetch(request);
+
+            // Clone response to add headers (responses are immutable)
+            response = new Response(response.body, response);
+            response.headers.set('X-Worker-Version', '1.0.1-debug');
+
+            // If the asset is not found (404), and it's likely a navigation request (SPA route)
 
             // If the asset is not found (404), and it's likely a navigation request (SPA route)
             // we should serve index.html instead.
