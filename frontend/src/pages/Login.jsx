@@ -70,7 +70,7 @@ export default function Login() {
                     <GoogleLogin
                         onSuccess={handleGoogleSuccess}
                         onError={handleGoogleError}
-                        useOneTap
+                        ux_mode="popup"
                         text="signin_with"
                         shape="rectangular"
                         logo_alignment="left"
