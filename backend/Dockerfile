@@ -22,6 +22,7 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     postgresql-client \
     curl \
+    cmake \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
