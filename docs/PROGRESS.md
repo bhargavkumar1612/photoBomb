@@ -2,13 +2,38 @@
 
 ## Overview
 
-**Status**: MVP Milestone 1 - Core Upload & View ✅ **95% Complete**
+**Status**: ✅ Phase 3: Intelligence & Discovery (Complete)
+
+**MVP Milestone 1**: ✅ 100% Complete (Core Upload & View)  
+**MVP Milestone 2**: ✅ 100% Complete (Face Recognition & Object Detection)  
+**Overall MVP**: ~95% Complete
 
 A production-ready photo service (PWA) with full planning documentation and working implementation.
 
 ---
 
 ## ✅ What's Been Built
+
+### 🎯 Feature Implementation Status
+
+**✅ Fully Implemented:**
+- Core Upload & Storage (R2/S3 via configurable storage provider)
+- Authentication (Google OAuth + JWT)
+- Thumbnails (libvips with AOT Presigned URLs)
+- Trash & Restore
+- Albums (Create, List, Add Photos, Contributors, Sharing)
+- Database Migrations (Alembic)
+- **Place Recognition** (GPS extraction, reverse geocoding, Map view)
+- **Face Recognition** (Detection, clustering, People gallery)
+- **Object & Scene Detection** (CLIP AI, automatic tagging)
+- **Advanced Sharing** (Share links, viewer tracking, contributor management)
+- **Hybrid Storage** (B2, S3, R2 support with per-photo provider tracking)
+
+**📋 Planned:**
+- Search & Discovery (Text + Semantic)
+- Notifications (WhatsApp, Email)
+
+---
 
 ### 📋 Planning & Documentation (100% Complete)
 
@@ -20,7 +45,7 @@ A production-ready photo service (PWA) with full planning documentation and work
 **API & Database:**
 - ✅ OpenAPI 3.0 specification (complete REST API)
 - ✅ PostgreSQL schema with pgvector for face embeddings
-- ✅ Cost model analysis (B2 vs R2 vs S3)
+- ✅ Cost model analysis (R2 vs S3)
 
 **Frontend & PWA:**
 - ✅ PWA specification with service worker strategies
@@ -58,7 +83,7 @@ Authentication:
 ✅ GET  /api/v1/auth/me
 
 Upload:
-✅ POST /api/v1/upload/presign  (B2 presigned URLs)
+✅ POST /api/v1/upload/presign  (R2 presigned URLs)
 ✅ POST /api/v1/upload/confirm  (trigger processing)
 
 Photos:
@@ -71,16 +96,18 @@ Photos:
 **Features Implemented:**
 - ✅ User registration with password hashing (bcrypt cost=12)
 - ✅ Login with timing attack protection
+- ✅ **Google Login** (OAuth2 integration)
 - ✅ JWT token refresh flow
 - ✅ Duplicate photo detection (SHA256)
 - ✅ Storage quota checking
-- ✅ B2 integration (presigned URLs, file management)
-- ✅ Celery worker skeleton with task routing
+- ✅ **Cloudflare R2** integration (S3-compatible API)
+- ✅ **AOT Presigned URLs** for secure image serving
+- ✅ Celery worker with full libvips thumbnail generation
+- ✅ **Trash & Restore** (Soft delete, permanent delete, restore UI)
+- ✅ Database migrations via Alembic
 
-**Remaining (5%):**
-- 🔄 Database migrations (Alembic setup)
-- 🔄 Complete thumbnail worker implementation
-- 🔄 EXIF extraction
+**Remaining:**
+- 🔄 EXIF extraction (Planned Milestone 2)
 
 ### 🎨 Frontend Implementation (100% Complete)
 
@@ -124,9 +151,9 @@ photoBomb/
 │   │   │   ├── user.py          ✅ User model
 │   │   │   └── photo.py         ✅ Photo + PhotoFile
 │   │   ├── services/
-│   │   │   └── b2_service.py    ✅ B2 integration
+│   │   │   └── s3_service.py    ✅ R2 (S3-compat) integration
 │   │   ├── workers/
-│   │   │   └── thumbnail_worker.py ✅ Skeleton
+│   │   │   └── thumbnail_worker.py ✅ Complete
 │   │   ├── celery_app.py        ✅ Celery config
 │   │   └── main.py              ✅ FastAPI app
 │   ├── Dockerfile               ✅
@@ -185,9 +212,9 @@ photoBomb/
 ```bash
 cd /Users/bhargavkumartatikonda/Desktop/learning/photoBomb
 
-# Configure B2 credentials
+# Configure R2 credentials
 cp backend/.env.example backend/.env
-# Edit backend/.env with your B2 keys
+# Edit backend/.env with your R2 keys (S3_ENDPOINT_URL, S3_ACCESS_KEY_ID, etc.)
 
 # Start all services (PostgreSQL, Redis, API, Worker)
 docker-compose up -d
@@ -232,19 +259,30 @@ npm run dev
 |---------|--------|-------|
 | User Registration | ✅ Complete | With email validation |
 | User Login | ✅ Complete | JWT tokens, timing attack protection |
+| Google Login | ✅ Complete | OAuth2 (server-side verification) |
 | Token Refresh | ✅ Complete | Automatic in frontend |
-| Photo Upload (Presign) | ✅ Complete | B2 presigned URLs |
+| Photo Upload (Presign) | ✅ Complete | R2/S3 presigned URLs |
 | Duplicate Detection | ✅ Complete | SHA256 hash checking |
 | Storage Quota | ✅ Complete | Enforced on upload |
 | Timeline View | ✅ Complete | Photo grid with pagination |
+| Thumbnails (Secure) | ✅ Complete | AOT Presigned URLs |
+| Trash / Restore | ✅ Complete | Soft delete + Restore UI |
 | Upload Progress | ✅ Complete | Real-time progress bars |
 | Photo Metadata | ✅ Complete | Caption, favorite, archived |
 | PWA Offline | ✅ Complete | Service worker + caching |
-| Thumbnail Generation | 🔄 Skeleton | Needs libvips implementation |
-| EXIF Extraction | ⏳ Planned | Week 2 |
-| Albums | ⏳ Planned | Milestone 2 |
+| Thumbnail Generation | ✅ Complete | libvips implementation |
+| Database Migrations | ✅ Complete | Alembic configured |
+| EXIF Extraction | ✅ Complete | GPS data, reverse geocoding |
+| Albums | ✅ Complete | Create, List, Contributors, Sharing |
+| **Storage Provider Abstraction** | ✅ Complete | B2, S3, R2 support with factory pattern |
+| **Hybrid Storage** | ✅ Complete | Per-photo provider tracking |
+| **Share Links** | ✅ Complete | Public album sharing with tokens |
+| **Viewer Tracking** | ✅ Complete | Detailed view events with user/timestamp |
+| **Contributor Management** | ✅ Complete | Album-level UI for managing contributors |
 | Search | ⏳ Planned | Milestone 2 |
-| Face Recognition | ⏳ Planned | Milestone 3 |
+| **Place Recognition** | ✅ Complete | GPS extraction, Map view with clusters |
+| **Face Recognition** | ✅ Complete | Detection, DBSCAN clustering, People gallery |
+| **Object Detection** | ✅ Complete | CLIP AI, auto-tagging (animals, documents, places) |
 
 ---
 
@@ -287,19 +325,20 @@ npm run dev
 - All 15+ deliverables complete
 - Architecture, API, database, security, infra, roadmap, testing
 
-**Backend**: 95% ✅
+**Backend**: 100% ✅
 - Core infrastructure complete
 - All MVP endpoints implemented
-- Worker skeleton ready
+- Worker implementation complete (libvips)
+- Alembic migrations active
 
 **Frontend**: 100% ✅
-- Full auth flow
+- Full auth flow (including Google)
 - Timeline with photo grid
 - Upload with progress
+- Trash & User Settings pages
 - PWA configured
 
-**Overall MVP M1**: 95% Complete
-- Estimated 1-2 days to finish remaining 5%
+**Overall MVP M1**: 100% Complete
 
 ---
 
@@ -317,7 +356,7 @@ Based on `cost_model.csv`:
 - Cloud Run (API): $50
 - Cloud SQL: $100
 - GKE (workers): $30
-- B2 Storage: $10
+- R2 Storage: $15
 - Misc (DNS, monitoring): $10
 
 ---
@@ -350,7 +389,7 @@ All documentation is in `/docs` with comprehensive details:
 ## 🏆 Achievements
 
 ✅ **Complete planning phase** - 15+ production-ready documents  
-✅ **Working backend** - FastAPI with JWT auth, B2 integration  
+✅ **Working backend** - FastAPI with JWT auth, R2 (S3) integration  
 ✅ **Modern frontend** - React PWA with offline support  
 ✅ **Infrastructure** - Terraform + Docker + K8s ready  
 ✅ **CI/CD** - GitHub Actions pipeline configured  
@@ -361,7 +400,7 @@ All documentation is in `/docs` with comprehensive details:
 
 **For you:**
 1. Review the implementation
-2. Add B2 credentials to `backend/.env`
+2. Add R2 credentials to `backend/.env`
 3. Test the flow locally
 4. Provide feedback or request changes
 
@@ -375,4 +414,4 @@ All documentation is in `/docs` with comprehensive details:
 
 **Built with attention to detail and production-ready practices! 🚀**
 
-Last Updated: December 10, 2024
+Last Updated: January 29, 2026

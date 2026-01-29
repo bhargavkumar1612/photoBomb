@@ -12,10 +12,10 @@ Build a privacy-first photo service that rivals Google Photos in features while 
 
 **Features**:
 - ✅ User registration & JWT auth
-- ✅ Direct browser→B2 uploads via presigned URLs
+- ✅ Direct browser→R2 uploads via presigned URLs (S3-compatible)
 - ✅ Thumbnail generation (256px, 512px, 1024px) in WebP/JPEG
 - ✅ Timeline view (sorted by date taken)
-- ✅ Basic albums (create, add photos, share link)
+- ✅ Albums (create, add photos, share link, contributors)
 - ✅ PWA installable (manifest + service worker)
 
 **Acceptance Criteria**:
@@ -69,11 +69,11 @@ Build a privacy-first photo service that rivals Google Photos in features while 
 
 **Features**:
 - ✅ Privacy UI: Explicit opt-in checkbox with clear explanation
-- ✅ Face detection (RetinaFace or MTCNN)
-- ✅ Face embedding (InsightFace ArcFace, 512-dim)
-- ✅ Clustering (DBSCAN, stored in pgvector)
-- ✅ Name faces (user-assigned labels)
-- ✅ Search by person ("Show all photos of Mom")
+- 🚧 Face detection (RetinaFace or MTCNN) - In Progress
+- 🚧 Face embedding (InsightFace ArcFace, 512-dim) - In Progress
+- 🚧 Clustering (DBSCAN, stored in pgvector) - Logic Complete
+- 🚧 Name faces (user-assigned labels) - API Partial
+- ⏳ Search by person ("Show all photos of Mom") - Planned
 
 **Acceptance Criteria**:
 1. User opts in → faces detected in uploaded photos
@@ -97,11 +97,11 @@ Build a privacy-first photo service that rivals Google Photos in features while 
 **Goal**: Password-protected shares, download control, analytics
 
 **Features**:
-- ✅ Password-protected share links (bcrypt)
-- ✅ Download enable/disable toggle
-- ✅ Share analytics (view count, download count, visitor IPs)
-- ✅ Expiry customization (1 day, 7 days, 30 days, never)
-- ✅ Revoke share link
+- 🚧 Password-protected share links (bcrypt) - DB Schema Ready
+- 🚧 Download enable/disable toggle - Planned
+- 🚧 Share analytics (view count, download count, visitor IPs) - DB Schema Ready
+- ⏳ Expiry customization (1 day, 7 days, 30 days, never) - Planned
+- ✅ Revoke share link - Implemented
 
 **Acceptance Criteria**:
 1. Password-protected share: Visitor must enter correct password to view

@@ -47,6 +47,7 @@ class User(Base):
     # Relationships
     photos = relationship("Photo", back_populates="user", cascade="all, delete-orphan")
     albums = relationship("Album", back_populates="user", cascade="all, delete-orphan")
+    shared_albums = relationship("Album", secondary="photobomb.album_contributors", back_populates="contributors")
     
     def __repr__(self):
         return f"<User {self.email}>"

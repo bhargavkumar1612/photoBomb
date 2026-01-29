@@ -19,6 +19,18 @@ album_photos = Table(
     schema='photobomb'
 )
 
+# Association table for album contributors
+album_contributors = Table(
+    'album_contributors',
+    Base.metadata,
+    Column('album_id', UUID(as_uuid=True), ForeignKey('photobomb.albums.album_id', ondelete='CASCADE'), primary_key=True),
+    Column('user_id', UUID(as_uuid=True), ForeignKey('photobomb.users.user_id', ondelete='CASCADE'), primary_key=True),
+    Column('role', String(50), default='contributor'), # contributor, viewer, admin
+    Column('joined_at', DateTime, default=datetime.utcnow),
+    schema='photobomb'
+)
+
+
 class Album(Base):
     """Album model for photo collections"""
     __tablename__ = "albums"
@@ -39,6 +51,7 @@ class Album(Base):
     # Relationships
     user = relationship("User", back_populates="albums")
     photos = relationship("Photo", secondary=album_photos, back_populates="albums")
+    contributors = relationship("User", secondary=album_contributors, back_populates="shared_albums")
     cover_photo = relationship("Photo", foreign_keys=[cover_photo_id])
     share_links = relationship("ShareLink", back_populates="album", cascade="all, delete-orphan")
 

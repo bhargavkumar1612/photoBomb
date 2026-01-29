@@ -1,5 +1,6 @@
+
 import { useEffect } from 'react'
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { SearchProvider } from './context/SearchContext'
 import AppLayout from './layouts/AppLayout'
@@ -12,18 +13,23 @@ import Albums from './pages/Albums'
 import AlbumDetail from './pages/AlbumDetail'
 import SharedAlbumView from './pages/SharedAlbumView'
 import Trash from './pages/Trash'
+import MapPage from './pages/MapPage'
+import PeoplePage from './pages/PeoplePage'
+import PersonDetailPage from './pages/PersonDetailPage'
+import { AnimalsPage, DocumentsPage, NaturePage } from './pages/CategoryPages'
 import PlaceholderPage from './pages/PlaceholderPage'
 import UploadProgressWidget from './components/UploadProgressWidget'
 import './App.css'
 
 function ProtectedRoute({ children }) {
     const { user, loading } = useAuth()
+    const location = useLocation()
 
     if (loading) {
         return <div className="loading">Loading...</div>
     }
 
-    return user ? children : <Navigate to="/login" />
+    return user ? children : <Navigate to="/login" state={{ from: location }} replace />
 }
 
 function PublicOnlyRoute({ children }) {
@@ -62,7 +68,6 @@ function App() {
                                 <Register />
                             </PublicOnlyRoute>
                         } />
-                        <Route path="/shared/:token" element={<SharedAlbumView />} />
 
                         <Route element={
                             <ProtectedRoute>
@@ -74,8 +79,13 @@ function App() {
                             <Route path="/sharing" element={<PlaceholderPage title="Sharing" />} />
                             <Route path="/albums" element={<Albums />} />
                             <Route path="/albums/:albumId" element={<AlbumDetail />} />
-                            <Route path="/people" element={<PlaceholderPage title="People" />} />
-                            <Route path="/places" element={<PlaceholderPage title="Places" />} />
+                            <Route path="/shared/:token" element={<SharedAlbumView />} />
+                            <Route path="/people" element={<PeoplePage />} />
+                            <Route path="/people/:id" element={<PersonDetailPage />} />
+                            <Route path="/places" element={<MapPage />} />
+                            <Route path="/animals" element={<AnimalsPage />} />
+                            <Route path="/documents" element={<DocumentsPage />} />
+                            <Route path="/nature" element={<NaturePage />} />
                             <Route path="/favorites" element={<Timeline favoritesOnly={true} />} />
                             <Route path="/trash" element={<Trash />} />
                             <Route path="/settings" element={<Settings />} />
@@ -92,5 +102,6 @@ function App() {
         </AuthProvider>
     )
 }
+
 
 export default App

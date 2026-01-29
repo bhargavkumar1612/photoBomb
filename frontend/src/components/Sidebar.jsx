@@ -8,7 +8,10 @@ import {
     MapPin,
     Trash2,
     Settings,
-    Camera
+    Camera,
+    PawPrint,
+    FileText,
+    Mountain
 } from 'lucide-react';
 import './Sidebar.css';
 
@@ -18,8 +21,11 @@ export default function Sidebar({ isOpen, onClose }) {
         { path: '/explore', icon: <Search size={20} />, label: 'Explore' },
         { path: '/sharing', icon: <Share2 size={20} />, label: 'Sharing' },
         { path: '/albums', icon: <FolderHeart size={20} />, label: 'Albums' },
-        { path: '/people', icon: <Users size={20} />, label: 'People' },
         { path: '/places', icon: <MapPin size={20} />, label: 'Places' },
+        { path: '/people', icon: <Users size={20} />, label: 'People' },
+        { path: '/animals', icon: <PawPrint size={20} />, label: 'Animals' },
+        { path: '/documents', icon: <FileText size={20} />, label: 'Documents' },
+        { path: '/nature', icon: <Mountain size={20} />, label: 'Nature' },
         { path: '/trash', icon: <Trash2 size={20} />, label: 'Trash' },
     ];
 

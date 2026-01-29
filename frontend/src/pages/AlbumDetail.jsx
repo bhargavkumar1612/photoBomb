@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Masonry from 'react-masonry-css'
-import { Plus, Share2, ArrowLeft } from 'lucide-react'
+import { Plus, Share2, ArrowLeft, Users, UserPlus, X } from 'lucide-react'
 import Lightbox from '../components/Lightbox'
 import PhotoPickerModal from '../components/PhotoPickerModal'
 import ShareModal from '../components/ShareModal'
@@ -20,6 +20,8 @@ export default function AlbumDetail() {
     const [lightboxPhoto, setLightboxPhoto] = useState(null)
     const [isPickerOpen, setIsPickerOpen] = useState(false)
     const [isShareModalOpen, setIsShareModalOpen] = useState(false)
+    const [isContributorModalOpen, setIsContributorModalOpen] = useState(false)
+    const [contributorEmail, setContributorEmail] = useState('')
     const [uploadingCount, setUploadingCount] = useState(0)
     const [gridSize, setGridSize] = useState(localStorage.getItem('gridSize') || 'comfortable')
 
@@ -71,6 +73,23 @@ export default function AlbumDetail() {
             queryClient.invalidateQueries({ queryKey: ['albums'] }) // Refresh list too
         }
     })
+
+    // Add Contributor Mutation
+    const addContributorMutation = useMutation({
+        mutationFn: async (email) => {
+            const res = await api.post(`/albums/${albumId}/contributors`, { email })
+            return res.data
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['album', albumId] })
+            setContributorEmail('')
+            setIsContributorModalOpen(false)
+        },
+        onError: (error) => {
+            alert(error.response?.data?.detail || 'Failed to add contributor')
+        }
+    })
+
 
     const handleRemoveFromAlbum = (photoId) => {
         if (window.confirm('Remove photo from album?')) {
@@ -139,13 +158,38 @@ export default function AlbumDetail() {
                 <div className="album-detail-info">
                     <h1>{album.name}</h1>
                     {album.description && <p>{album.description}</p>}
-                    <span className="album-detail-count">{album.photo_count} photos</span>
+                    <div className="album-meta-row">
+                        <span className="album-detail-count">{album.photo_count} photos</span>
+                        {album.contributors && album.contributors.length > 0 && (
+                            <div className="album-contributors-badge" title="Contributors">
+                                <Users size={14} className="icon-contributors" />
+                                <div className="contributors-avatars">
+                                    {album.contributors.slice(0, 3).map(c => (
+                                        <div key={c.user_id} className="mini-avatar" title={c.full_name}>
+                                            {c.full_name.charAt(0)}
+                                        </div>
+                                    ))}
+                                    {album.contributors.length > 3 && (
+                                        <div className="mini-avatar more">+{album.contributors.length - 3}</div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
                 <div className="album-detail-actions">
-                    <button className="btn-secondary" onClick={() => setIsShareModalOpen(true)}>
-                        <Share2 size={18} style={{ marginRight: 6 }} />
-                        Share
-                    </button>
+                    {album.is_owner && (
+                        <>
+                            <button className="btn-secondary" onClick={() => setIsShareModalOpen(true)}>
+                                <Share2 size={18} style={{ marginRight: 6 }} />
+                                Share
+                            </button>
+                            <button className="btn-secondary" onClick={() => setIsContributorModalOpen(true)}>
+                                <UserPlus size={18} style={{ marginRight: 6 }} />
+                                Manage Contributors
+                            </button>
+                        </>
+                    )}
                     <button className="btn-primary" onClick={() => setIsPickerOpen(true)}>
                         <Plus size={18} style={{ marginRight: 6 }} />
                         Add Photos
@@ -188,7 +232,7 @@ export default function AlbumDetail() {
                             onLightbox={setLightboxPhoto}
                             onFavorite={() => { }} // TODO: Add favorite mutation if needed, or pass empty
                             isDeleting={false}
-                            onDelete={(id) => handleRemoveFromAlbum(id)}
+                            onDelete={album.is_owner ? (id) => handleRemoveFromAlbum(id) : undefined}
                             onDownload={handleDownload}
                             onInfo={() => alert(`File: ${photo.filename}`)}
                             onShare={() => { }}
@@ -222,6 +266,105 @@ export default function AlbumDetail() {
                 onClose={() => setIsShareModalOpen(false)}
                 albumId={albumId}
             />
+
+            {/* Contributor Management Modal */}
+            {isContributorModalOpen && (
+                <div className="modal-overlay" onClick={() => setIsContributorModalOpen(false)}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+                        <div className="modal-header">
+                            <h2>Manage Contributors</h2>
+                            <button className="btn-close" onClick={() => setIsContributorModalOpen(false)}>
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="modal-body">
+                            <form
+                                onSubmit={(e) => {
+                                    e.preventDefault()
+                                    if (contributorEmail) addContributorMutation.mutate(contributorEmail)
+                                }}
+                                style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}
+                            >
+                                <input
+                                    type="email"
+                                    placeholder="Enter user email"
+                                    value={contributorEmail}
+                                    onChange={e => setContributorEmail(e.target.value)}
+                                    required
+                                    style={{
+                                        flex: 1,
+                                        padding: '10px 14px',
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: '8px',
+                                        fontSize: '14px',
+                                        outline: 'none'
+                                    }}
+                                />
+                                <button
+                                    type="submit"
+                                    className="btn-primary"
+                                    disabled={addContributorMutation.isPending}
+                                    style={{ whiteSpace: 'nowrap' }}
+                                >
+                                    <UserPlus size={16} style={{ marginRight: 6 }} />
+                                    {addContributorMutation.isPending ? 'Adding...' : 'Invite'}
+                                </button>
+                            </form>
+
+                            <div>
+                                <h3 style={{ fontSize: '14px', color: '#6b7280', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                    Contributors ({album?.contributors?.length || 0})
+                                </h3>
+                                {!album?.contributors || album.contributors.length === 0 ? (
+                                    <p style={{ textAlign: 'center', color: '#9ca3af', padding: '20px 0' }}>
+                                        No contributors yet.
+                                    </p>
+                                ) : (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                        {album.contributors.map(c => (
+                                            <div
+                                                key={c.user_id}
+                                                style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '12px',
+                                                    padding: '12px',
+                                                    background: '#f9fafb',
+                                                    border: '1px solid #e5e7eb',
+                                                    borderRadius: '8px'
+                                                }}
+                                            >
+                                                <div style={{
+                                                    width: '40px',
+                                                    height: '40px',
+                                                    borderRadius: '50%',
+                                                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                                    color: 'white',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    fontWeight: 700,
+                                                    fontSize: '16px'
+                                                }}>
+                                                    {c.full_name.charAt(0)}
+                                                </div>
+                                                <div style={{ flex: 1 }}>
+                                                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>
+                                                        {c.full_name}
+                                                    </div>
+                                                    <div style={{ fontSize: '12px', color: '#6b7280' }}>
+                                                        {c.email}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

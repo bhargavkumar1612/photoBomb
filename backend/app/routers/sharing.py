@@ -1,16 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, selectinload, joinedload
-from sqlalchemy import select
-from typing import List
+from sqlalchemy import select, func
+from typing import List, Optional
 import secrets
 from datetime import datetime
 
 from app.core.database import get_db
-from app.api.auth import get_current_user
+from app.api.auth import get_current_user, get_optional_current_user
 from app.models.user import User
 from app.models.album import Album
 from app.models.photo import Photo
-from app.models.share_link import ShareLink
+from app.models.share_link import ShareLink, ShareLinkView
 from app.schemas.sharing import ShareLinkCreate, ShareLinkResponse, SharedAlbumView
 from app.services.storage_factory import get_storage_service
 from app.core.config import settings
@@ -56,18 +56,43 @@ async def get_album_share_links(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get all share links for an album"""
+    """Get all share links for an album with usage stats"""
+    # Use selectinload to load views_detail and the associated user for each view
     result = await db.execute(
-        select(Album)
-        .options(selectinload(Album.share_links))
+        select(ShareLink)
+        .options(
+            selectinload(ShareLink.views_detail).selectinload(ShareLinkView.user)
+        )
+        .join(Album)
         .where(Album.album_id == album_id, Album.user_id == current_user.user_id)
     )
-    album = result.scalar_one_or_none()
-
-    if not album:
-        raise HTTPException(status_code=404, detail="Album not found")
+    share_links = result.scalars().all()
+    
+    # Map views_detail to viewers list for response
+    for link in share_links:
+        viewers_list = []
+        # Group by user to show latest view? Or show all individual views?
+        # User request: "who has seen my album". 
+        # Listing unique users is probably better than a raw log.
+        # Let's map unique users, taking the most recent 'viewed_at'
         
-    return album.share_links
+        seen_users = {}
+        for view in link.views_detail:
+            if view.user_id: # Only logged in users
+                # If using eager loading, view.user should be available
+                u = view.user
+                if u:
+                    if u.user_id not in seen_users or view.viewed_at > seen_users[u.user_id]['viewed_at']:
+                        seen_users[u.user_id] = {
+                            "user_id": u.user_id,
+                            "full_name": u.full_name,
+                            "viewed_at": view.viewed_at
+                        }
+        
+        # Sort by viewed_at desc
+        link.viewers = sorted(seen_users.values(), key=lambda x: x['viewed_at'], reverse=True)
+
+    return share_links
 
 @router.delete("/share/{token}")
 async def revoke_share_link(
@@ -94,13 +119,14 @@ async def revoke_share_link(
 @router.get("/shared/{token}", response_model=SharedAlbumView)
 async def view_shared_album(
     token: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_current_user)
 ):
     """Public endpoint to view a shared album"""
     result = await db.execute(
         select(ShareLink)
         .options(
-            selectinload(ShareLink.album).selectinload(Album.photos)
+            selectinload(ShareLink.album).selectinload(Album.photos).selectinload(Photo.user)
         )
         .where(ShareLink.token == token)
     )
@@ -113,21 +139,32 @@ async def view_shared_album(
     if share.expires_at and share.expires_at < datetime.utcnow():
         raise HTTPException(status_code=410, detail="Link expired")
         
-    # Increment views
-    share.views += 1
-    await db.commit()
+    # Record View safely
+    try:
+        view_entry = ShareLinkView(
+            share_link_id=share.id,
+            user_id=current_user.user_id if current_user else None,
+            viewed_at=datetime.utcnow()
+        )
+        db.add(view_entry)
+            
+        # Increment aggregate counter
+        share.views += 1
+        await db.commit()
+    except Exception as e:
+        print(f"Failed to log view: {e}")
+        # Identify failure but don't block response
+        await db.rollback()
     
     # Get Album details
     album = share.album
     
-    # Get Owner details
+    # Get Album Owner details
     result_owner = await db.execute(select(User).where(User.user_id == album.user_id))
     owner = result_owner.scalar_one_or_none()
     
     if not owner:
-        # Should technically not happen if FK integrity holds, but good safety
         owner_name = "Unknown"
-        # Can't generate valid URLs if we don't know the user_id prefix, but we have album.user_id
         owner_user_id = album.user_id
     else:
         owner_name = owner.full_name
@@ -141,13 +178,25 @@ async def view_shared_album(
 
     # Process photos with Signed URLs
     photo_list = []
+    
+    # For shared view permission check: if logged-in user is a contributor, frontend might show "Add" button
+    # But this endpoint just returns photos.
+    
     for photo in album.photos:
-        key_base = f"uploads/{owner_user_id}/{photo.photo_id}"
+        # Photos store the user_id of uploader.
+        uploader_id = photo.user_id
+        
+        # We need the uploader's name. We eagerly loaded Photo.user.
+        uploader_name = photo.user.full_name if photo.user else "Unknown"
+        uploader_avatar = None # photo.user.avatar_url if we had one
+        
+        key_base = f"uploads/{uploader_id}/{photo.photo_id}"
 
         # Generate signed URLs manually using the batch token
         thumb_urls = {
-            "small": sign_b2_url(f"{key_base}/thumbnails/thumb_256.jpg"),
-            "medium": sign_b2_url(f"{key_base}/thumbnails/thumb_512.jpg"),
+            "thumb_256": sign_b2_url(f"{key_base}/thumbnails/thumb_256.jpg"),
+            "thumb_512": sign_b2_url(f"{key_base}/thumbnails/thumb_512.jpg"),
+            "thumb_1024": sign_b2_url(f"{key_base}/thumbnails/thumb_1024.jpg"),
             "original": sign_b2_url(f"{key_base}/original/{photo.filename}")
         }
         
@@ -156,14 +205,16 @@ async def view_shared_album(
             "filename": photo.filename,
             "thumb_urls": thumb_urls,
             "taken_at": photo.taken_at,
-            # photo.width/height not directly available on Photo model, skipping for now
-            # "width": photo.width,
-            # "height": photo.height
+            "owner": {
+                "user_id": str(uploader_id),
+                "name": uploader_name
+            }
         })
         
     return {
         "album_name": album.name,
         "album_description": album.description,
         "owner_name": owner_name,
-        "photos": photo_list
+        "photos": photo_list,
+        # "can_add_photos": is_contributor # Future optimization
     }

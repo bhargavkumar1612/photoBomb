@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { GoogleLogin } from '@react-oauth/google'
 import api from '../services/api'
@@ -12,6 +12,8 @@ export default function Login() {
     const [loading, setLoading] = useState(false)
     const { login, setUser } = useAuth()
     const navigate = useNavigate()
+    const location = useLocation()
+    const from = location.state?.from?.pathname || '/'
 
     const handleSubmit = async (e) => {
         e.preventDefault()
@@ -20,6 +22,7 @@ export default function Login() {
 
         try {
             await login(email, password)
+            navigate(from, { replace: true })
         } catch (err) {
             setError(err.response?.data?.detail || 'Login failed. Please try again.')
         } finally {
@@ -44,7 +47,7 @@ export default function Login() {
 
             // Update context and navigate
             setUser(user)
-            navigate('/')
+            navigate(from, { replace: true })
         } catch (err) {
             setError(err.response?.data?.detail || 'Google sign-in failed. Please try again.')
             setLoading(false)

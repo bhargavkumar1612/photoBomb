@@ -6,12 +6,19 @@
 
 PhotoBomb is a comprehensive production plan for building a full-featured photo service (PWA) with:
 
-- **Direct browser uploads** to Backblaze B2 (presigned URLs)
+- **Configurable Storage** - Support for Backblaze B2, Cloudflare R2, or AWS S3 via pluggable storage architecture
+- **Direct browser uploads** to cloud storage (S3-compatible presigned URLs)
+- **Secure Image Serving** via AOT Presigned URLs (no public buckets)
 - **Smart processing pipeline** (thumbnails, EXIF, deduplication)
-- **Optional face recognition** (explicit opt-in, pgvector embeddings)
+- **Google Login** & standard JWT Auth
+- **Albums** with collaborative features (contributors, sharing, viewer tracking)
+- **Trash & Restore** functionality with soft delete
+- **Face Recognition** with automatic clustering (DBSCAN, pgvector embeddings)
+- **Object & Scene Detection** via CLIP AI (animals, documents, places)
+- **Place Recognition** with GPS extraction and reverse geocoding
 - **PWA installable** on Android/iOS (offline uploads, service worker)
 - **Privacy-first design** (GDPR/CCPA compliant, user data control)
-- **Cost-optimized architecture** (~$10-50/month for 1-20TB storage)
+- **Cost-optimized architecture** (~$15-60/month for 1-20TB storage)
 
 ## 📁 Repository Structure
 
@@ -31,7 +38,7 @@ photoBomb/
 │   ├── operations/
 │   │   ├── monitoring.md             # Metrics, SLOs, dashboards
 │   │   └── runbook.md                # Common operational tasks
-│   ├── cost_model.csv                # B2 vs R2 vs S3 cost analysis
+│   ├── cost_model.csv                # R2 vs S3 cost analysis
 │   ├── pwa_spec.md                   # Manifest, service worker, offline
 │   ├── roadmap.md                    # 3-month MVP + 9-month scale plan
 │   ├── testing_plan.md               # Unit, integration, E2E, load tests
@@ -87,11 +94,11 @@ photoBomb/
 ### 4. Cost Analysis
 
 **Cost Model**: [docs/cost_model.csv](docs/cost_model.csv)
-- B2 vs R2 vs S3 comparison
+- R2 vs S3 comparison
 - 1TB, 5TB, 20TB scenarios
 - Growth projections (3-18 months)
 
-**Key Takeaway**: B2 wins for MVP (<10TB), R2 for high-traffic (>10TB/mo reads)
+**Key Takeaway**: Cloudflare R2 is preferred for high-bandwidth apps due to **zero egress fees**, despite slightly higher storage costs ($15/TB vs B2's $5/TB) compared to B2, but significantly cheaper than AWS S3.
 
 ### 5. Security & Privacy
 
@@ -173,10 +180,11 @@ k6 run tests/load/upload_spike.js
 
 ## 📊 Key Design Decisions & Tradeoffs
 
-### Why Backblaze B2 over AWS S3?
-- **Cost**: $5/TB/month vs. $23/TB/month (4.6x cheaper)
-- **Tradeoff**: B2 egress is $0.01/GB after 3x storage free tier; S3 is $0.09/GB
-- **Mitigation**: Cloudflare CDN (95%+ cache hit ratio) minimizes egress
+### Why Cloudflare R2 over AWS S3 or Backblaze B2?
+- **Zero Egress Fees**: Unlike S3 ($0.09/GB) or B2 ($0.01/GB after limit), R2 has $0 egress. This is critical for a media-heavy app.
+- **S3 Compatibility**: Drop-in replacement for S3 SDKs (boto3, etc.).
+- **Cost**: $15/TB/month storage is higher than B2 ($5/TB) but the free egress saves money for read-heavy workloads.
+- **Performance**: Edge-native performance.
 
 ### Why libvips over ImageMagick?
 - **Performance**: 4-8x faster for batch thumbnail generation
@@ -226,7 +234,7 @@ k6 run tests/load/upload_spike.js
 
 ### Multi-Region (Future)
 
-- **Storage**: Replicate B2 buckets to EU region (if EU users > 30%)
+- **Storage**: Replicate R2 buckets to EU region (if EU users > 30%)
 - **CDN**: Cloudflare already multi-region (auto-optimized)
 - **Database**: Use Cloud SQL read replicas in EU region (async replication)
 
@@ -283,9 +291,11 @@ See [docs/compliance.md](docs/compliance.md) for full checklist.
 - **Connection Pool**: PgBouncer (transaction mode)
 
 ### Storage
-- **Primary**: Backblaze B2 (private bucket)
-- **Alternative**: Cloudflare R2 (if reads > 10TB/month)
-- **CDN**: Cloudflare (free tier + pay-as-you-go)
+- **Primary**: Configurable (Backblaze B2, Cloudflare R2, or AWS S3)
+- **Architecture**: Pluggable storage factory pattern with per-photo provider tracking
+- **Bucket Type**: Private (all access via signed URLs)
+- **CDN**: Cloudflare (integrated)
+- **Hybrid Support**: Multiple storage providers can be used simultaneously
 
 ### Processing
 - **Image Library**: libvips 8.14+ (pyvips for Python)
@@ -346,4 +356,4 @@ See [docs/compliance.md](docs/compliance.md) for full checklist.
 
 **Built with ruthless attention to detail by [Your Team Name]**
 
-*Last Updated: December 2024*
+*Last Updated: January 2026*

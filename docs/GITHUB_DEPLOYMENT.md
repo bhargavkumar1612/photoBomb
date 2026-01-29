@@ -31,95 +31,48 @@ docker compose version
 
 Go to your repository **Settings** > **Secrets and variables** > **Actions** and add the following secrets:
 
+### Backend Secrets (for VPS Deployment)
 | Secret Name | Description |
 |---|---|
 | `HOST` | The IP address of your VPS. |
 | `USERNAME` | Your SSH username (usually `root` or `ubuntu`). |
-| `SSH_KEY` | Your private SSH key (generate one locally with `ssh-keygen` and add public key to VPS `~/.ssh/authorized_keys`). |
-| `B2_KEY_ID` | Backblaze Application Key ID. |
-| `B2_KEY` | Backblaze Application Key. |
-| `B2_BUCKET_ID` | Backblaze Bucket ID. |
+| `SSH_KEY` | Your private SSH key. |
+| `S3_ENDPOINT_URL` | Cloudflare R2 Endpoint URL (e.g. `https://<account>.r2.cloudflarestorage.com`). |
+| `S3_ACCESS_KEY_ID` | R2 Access Key ID. |
+| `S3_SECRET_ACCESS_KEY` | R2 Secret Access Key. |
+| `S3_BUCKET_NAME` | R2 Bucket Name. |
+| `S3_REGION_NAME` | R2 Region (usually `auto`). |
 | `JWT_SECRET` | A long random string for JWT signing. |
 | `DB_PASSWORD` | A secure password for the production database. |
 
-## 3. Configure the Deployment Workflow
+### Frontend Secrets (for Cloudflare Deployment)
+| Secret Name | Description |
+|---|---|
+| `CLOUDFLARE_API_TOKEN` | Token with Workers/Pages edit permissions. |
+| `CLOUDFLARE_ACCOUNT_ID` | Your Cloudflare Account ID. |
+| `VITE_GOOGLE_CLIENT_ID` | Google OAuth Client ID for the frontend. |
 
-Create a file at `.github/workflows/deploy.yml` in your repository:
+## 3. Configure Deployment Workflows
 
-```yaml
-name: Deploy to Production
+The project uses a **Split Deployment Architecture**:
+1. **Backend**: Deployed to a VPS (via Docker Compose/SSH) using `.github/workflows/deploy.yml`.
+2. **Frontend**: Deployed to Cloudflare Workers/Pages using `.github/workflows/deploy-frontend.yml`.
 
-on:
-  push:
-    branches: [ "main" ]
+### Backend Workflow (`deploy.yml`)
+(Already configured in repo - pushes to VPS, builds Docker containers, runs migrations)
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+### Frontend Workflow (`deploy-frontend.yml`)
+(Already configured in repo - builds React app, deploys to Cloudflare)
 
-      - name: Copy files via SCP
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.SSH_KEY }}
-          source: "."
-          target: "/opt/photobomb"
+## 4. Reverse Proxy (Nginx) for Backend
 
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.SSH_KEY }}
-          script: |
-            cd /opt/photobomb
-            
-            # Create/Update .env file from secrets
-            echo "DATABASE_URL=postgresql+asyncpg://photobomb:${{ secrets.DB_PASSWORD }}@postgres:5432/photobomb" > backend/.env
-            echo "REDIS_URL=redis://redis:6379/0" >> backend/.env
-            echo "JWT_SECRET_KEY=${{ secrets.JWT_SECRET }}" >> backend/.env
-            echo "B2_APPLICATION_KEY_ID=${{ secrets.B2_KEY_ID }}" >> backend/.env
-            echo "B2_APPLICATION_KEY=${{ secrets.B2_KEY }}" >> backend/.env
-            echo "B2_BUCKET_NAME=photobomb-prod" >> backend/.env
-            echo "B2_BUCKET_ID=${{ secrets.B2_BUCKET_ID }}" >> backend/.env
-            
-            # Restart containers
-            docker compose down
-            docker compose up -d --build
-            
-            # Run migrations
-            docker compose exec -T api alembic upgrade head
-```
+Since the frontend is hosted on Cloudflare, your VPS only needs to serve the API.
 
-## 4. Initial Push
-
-1.  Initialize git if you haven't:
-    ```bash
-    git init
-    git add .
-    git commit -m "Initial commit"
-    ```
-2.  Create a repo on GitHub.
-3.  Push your code:
-    ```bash
-    git branch -M main
-    git remote add origin https://github.com/YOUR_USERNAME/photobomb.git
-    git push -u origin main
-    ```
-
-Once pushed, the check the **Actions** tab in GitHub to watch the deployment proceed.
-
-## 5. Reverse Proxy (Nginx)
-
-For production, run Nginx on the host to handle SSL (HTTPS).
-
-1.  Install Nginx: `sudo apt install nginx`
+1.  install Nginx: `sudo apt install nginx`
 2.  Install Certbot: `sudo apt install certbot python3-certbot-nginx`
-3.  Configure Nginx to proxy requests:
-    - Port 80/443 -> localhost:3000 (Frontend)
-    - /api -> localhost:8000 (Backend)
-4.  Run `sudo certbot --nginx` to get a free SSL certificate.
+3.  Configure Nginx to proxy API requests:
+    - **Domain**: `api.yourdomain.com` (or similar)
+    - **Proxy Pass**: `http://localhost:8000`
+4.  Run `sudo certbot --nginx` to enable HTTPS.
+
+**Note**: Ensure your Backend `ALLOWED_ORIGINS` env var (or config) allows requests from your Cloudflare frontend domain.

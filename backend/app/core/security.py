@@ -8,8 +8,8 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from app.core.config import settings
 
-# Password hashing context (bcrypt with cost factor 12)
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=12)
+# Password hashing context (bcrypt with cost factor 10)
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=10)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:

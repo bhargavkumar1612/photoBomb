@@ -1,7 +1,8 @@
 - [ ] **Environment Setup**
-  - [ ] Backblaze B2 account created
+  - [ ] Cloudflare R2 account created
   - [ ] Bucket created (private)
-  - [ ] Application key generated
+  - [ ] R2 Access Keys generated (Edit permissions)
+  - [ ] Credentials added to `backend/.env` (S3_ENDPOINT_URL, etc.)
   - [ ] Credentials added to `backend/.env`
 
 - [ ] **Local Testing**

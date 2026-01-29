@@ -14,7 +14,8 @@ export default function PhotoItem({
     onDownload,
     onInfo,
     onShare,
-    onAddToAlbum
+    onAddToAlbum,
+    readonly = false
 }) {
     const [imageLoaded, setImageLoaded] = useState(false)
     const [hasError, setHasError] = useState(false)
@@ -90,24 +91,35 @@ export default function PhotoItem({
 
             {!selectionMode && (
                 <div className="photo-overlay">
-                    <button
-                        className={`favorite-btn ${photo.favorite ? 'favorited' : ''}`}
-                        onClick={(e) => { e.stopPropagation(); onFavorite(photo.photo_id) }}
-                        title={photo.favorite ? "Remove from favorites" : "Add to favorites"}
-                    >
-                        <Heart size={20} fill={photo.favorite ? "currentColor" : "none"} strokeWidth={2} />
-                    </button>
+                    {!readonly && (
+                        <>
+                            <button
+                                className={`favorite-btn ${photo.favorite ? 'favorited' : ''}`}
+                                onClick={(e) => { e.stopPropagation(); onFavorite(photo.photo_id) }}
+                                title={photo.favorite ? "Remove from favorites" : "Add to favorites"}
+                            >
+                                <Heart size={20} fill={photo.favorite ? "currentColor" : "none"} strokeWidth={2} />
+                            </button>
 
-                    <button
-                        className="delete-btn"
-                        onClick={(e) => { e.stopPropagation(); onDelete(photo.photo_id, photo.filename) }}
-                        disabled={isDeleting}
-                        title="Delete"
-                    >
-                        {isDeleting ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={20} />}
-                    </button>
+                            {onDelete && (
+                                <button
+                                    className="delete-btn"
+                                    onClick={(e) => { e.stopPropagation(); onDelete(photo.photo_id, photo.filename) }}
+                                    disabled={isDeleting}
+                                    title="Delete"
+                                >
+                                    {isDeleting ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={20} />}
+                                </button>
+                            )}
+                        </>
+                    )}
 
                     <div className="overlay-bottom">
+                        {photo.owner && (
+                            <div className="photo-owner-badge" title={`Uploaded by ${photo.owner.name}`} style={{ marginRight: 'auto', background: 'rgba(0,0,0,0.4)', color: 'white', padding: '4px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 600 }}>
+                                {photo.owner.name}
+                            </div>
+                        )}
                         <button className="overlay-btn" onClick={(e) => { e.stopPropagation(); onDownload(photo) }} title="Download">
                             <Download size={18} />
                         </button>

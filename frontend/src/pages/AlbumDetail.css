@@ -111,3 +111,57 @@
     background: #f9fafb;
     border-color: #9ca3af;
 }
+
+/* Contributors Header Badge */
+.album-meta-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-top: 8px;
+}
+
+.album-contributors-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #f3f4f6;
+    padding: 4px 8px;
+    border-radius: 20px;
+    cursor: default;
+    border: 1px solid #e5e7eb;
+}
+
+.icon-contributors {
+    color: #6b7280;
+}
+
+.contributors-avatars {
+    display: flex;
+    align-items: center;
+}
+
+.mini-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #3b82f6;
+    /* Blue default for visual pop */
+    color: white;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid white;
+    margin-left: -8px;
+    font-weight: 600;
+}
+
+.mini-avatar:first-child {
+    margin-left: 0;
+}
+
+.mini-avatar.more {
+    background: #e5e7eb;
+    color: #4b5563;
+    font-size: 10px;
+}

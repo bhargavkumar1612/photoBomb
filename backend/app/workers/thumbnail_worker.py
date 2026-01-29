@@ -183,42 +183,232 @@ def process_upload(self, upload_id: str, photo_id: str):
                 sha256 = compute_sha256(tmp_path)
                 phash = compute_perceptual_hash(tmp_path)
                 size_bytes = len(original_bytes)
+
+                # 4a. Extract EXIF Data (Taken At, GPS)
+                import piexif
+                from PIL.ExifTags import TAGS, GPSTAGS
                 
-                # 4a. Attempt to extract date from filename if taken_at is missing (e.g., WhatsApp)
-                # WhatsApp format: "WhatsApp Image 2025-10-25 at 16.37.02.jpeg"
-                import re
-                filename_date = None
+                exif_data = {}
+                gps_data = {}
                 
-                # Regex for WhatsApp matching: YYYY-MM-DD at HH.MM.SS
-                # Also matches "IMG-20251025-WA0001" style if needed, but let's target the specific one seen
-                wa_pattern = re.search(r"(\d{4}-\d{2}-\d{2}) at (\d{2}\.\d{2}\.\d{2})", photo.filename)
-                if wa_pattern:
+                try:
+                    # Load image to read info
+                    with Image.open(tmp_path) as img:
+                        info = img._getexif()
+                        if info:
+                            for tag, value in info.items():
+                                decoded = TAGS.get(tag, tag)
+                                if decoded == "GPSInfo":
+                                    for t in value:
+                                        sub_decoded = GPSTAGS.get(t, t)
+                                        gps_data[sub_decoded] = value[t]
+                                else:
+                                    exif_data[decoded] = value
+                except Exception as e:
+                    print(f"Error extracting EXIF: {e}")
+
+                # Parse Taken At
+                taken_at = None
+                if "DateTimeOriginal" in exif_data:
                     try:
-                        date_str = wa_pattern.group(1)
-                        time_str = wa_pattern.group(2).replace('.', ':')
-                        filename_date = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M:%S")
-                        print(f"Extracted date from filename: {filename_date}")
+                        taken_at = datetime.strptime(exif_data["DateTimeOriginal"], "%Y:%m:%d %H:%M:%S")
                     except ValueError:
                         pass
                 
-                # Fallback: YYYYMMDD_HHMMSS or IMG_YYYYMMDD_HHMMSS
-                if not filename_date:
-                    compact_pattern = re.search(r"(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})", photo.filename)
-                    if compact_pattern:
+                # If not in EXIF, check filename (WhatsApp etc) - already implemented below but we can prioritize EXIF
+                if taken_at:
+                    photo.taken_at = taken_at
+                
+                # Parse GPS
+                def convert_to_degrees(value):
+                    d, m, s = value
+                    return d + (m / 60.0) + (s / 3600.0)
+
+                if "GPSLatitude" in gps_data and "GPSLongitude" in gps_data:
+                    try:
+                        lat = convert_to_degrees(gps_data["GPSLatitude"])
+                        lng = convert_to_degrees(gps_data["GPSLongitude"])
+                        
+                        if gps_data.get("GPSLatitudeRef") == "S":
+                            lat = -lat
+                        if gps_data.get("GPSLongitudeRef") == "W":
+                            lng = -lng
+                            
+                        photo.gps_lat = lat
+                        photo.gps_lng = lng
+                        
+                        # Reverse Geocode
+                        import reverse_geocoder as rg
+                        results = rg.search((lat, lng))
+                        if results:
+                            # e.g., output: [{'lat': '...', 'lon': '...', 'name': 'City Name', 'admin1': 'State', 'cc': 'Country Code'}]
+                            city = results[0].get('name')
+                            state = results[0].get('admin1')
+                            country = results[0].get('cc')
+                            location_parts = [p for p in [city, state, country] if p]
+                            photo.location_name = ", ".join(location_parts)
+                            print(f"Location found: {photo.location_name}")
+                            
+                    except Exception as e:
+                        print(f"Error parsing GPS: {e}")
+                    except Exception as e:
+                        print(f"Error parsing GPS: {e}")
+
+                # 4c. Face Recognition
+                try:
+                    import face_recognition
+                    import numpy as np
+                    from app.models.person import Face
+                    
+                    # Convert PIL Image to RGB and then to numpy array
+                    with Image.open(tmp_path) as img:
+                        # Ensure RGB
+                        if img.mode != 'RGB':
+                            rgb_img = img.convert('RGB')
+                        else:
+                            rgb_img = img
+                        
+                        # Resize for faster processing if image is huge (optional, but recommended for speed)
+                        # face_recognition works best on moderate sizes, but for accuracy on high-res, full size is better but slower.
+                        # Let's keep full size for now or cap at 1600px max dimension?
+                        # For now, just use original.
+                        np_image = np.array(rgb_img)
+                        
+                    print(f"Detecting faces in {photo.filename}...")
+                    # Detect faces (HOG-based model is faster, cnn is more accurate but requires GPU)
+                    face_locations = face_recognition.face_locations(np_image, model="hog")
+                    print(f"Found {len(face_locations)} faces")
+                    
+                    if face_locations:
+                        face_encodings = face_recognition.face_encodings(np_image, face_locations)
+                        
+                        for location, encoding in zip(face_locations, face_encodings):
+                            top, right, bottom, left = location
+                            
+                            new_face = Face(
+                                photo_id=photo.photo_id,
+                                encoding=encoding.tolist(),  # Store as list, pgvector will handle it
+                                location_top=top,
+                                location_right=right,
+                                location_bottom=bottom,
+                                location_left=left
+                            )
+                            db.add(new_face)
+                            # Note: We are NOT assigning person_id yet. That happens in clustering step.
+                            
+                except ImportError:
+                    print("Face recognition libraries not found/installed. Skipping.")
+                except Exception as e:
+                    print(f"Error in face recognition: {e}")
+
+                # 4d. Object & Scene Detection (CLIP)
+                try:
+                    from transformers import pipeline
+                    from app.models.tag import Tag, PhotoTag
+                    from app.core.database import AsyncSessionLocal
+                    from sqlalchemy import select
+
+                    # Labels
+                    candidate_labels = [
+                        "animal", "dog", "cat", "bird", "wildlife",
+                        "document", "receipt", "invoice", "id card", "paper",
+                        "nature", "beach", "mountain", "forest", "sunset", "sky",
+                        "city", "architecture", "street", "building",
+                        "food", "drink", "meal",
+                        "vehicle", "car", "bicycle", "plane",
+                        "screenshot", "text", "diagram"
+                    ]
+                    
+                    print(f"Classifying scene in {photo.filename}...")
+                    
+                    # Use 'zero-shot-image-classification'
+                    # Model: 'openai/clip-vit-base-patch32'
+                    classifier = pipeline("zero-shot-image-classification", model="openai/clip-vit-base-patch32")
+                    
+                    # Predict
+                    results = classifier(tmp_path, candidate_labels=candidate_labels)
+                    
+                    # Filter and save
+                    for res in results:
+                        label = res['label']
+                        score = res['score']
+                        
+                        if score > 0.2: # Threshold
+                            # Check existing tag
+                            result = await db.execute(select(Tag).where(Tag.name == label))
+                            existing_tag = result.scalar_one_or_none()
+                            
+                            tag_id = None
+                            if not existing_tag:
+                                # Determine category
+                                category = "general"
+                                if label in ["dog", "cat", "bird", "animal", "wildlife"]:
+                                    category = "animal"
+                                elif label in ["document", "receipt", "invoice", "id card", "paper", "text", "diagram"]:
+                                    category = "document"
+                                elif label in ["nature", "beach", "mountain", "forest", "sunset", "sky", "city", "architecture", "street", "building"]:
+                                    category = "place"
+                                
+                                try:
+                                    new_tag = Tag(name=label, category=category)
+                                    db.add(new_tag)
+                                    await db.flush()
+                                    tag_id = new_tag.tag_id
+                                except Exception: 
+                                    # Race condition likely
+                                    await db.rollback()
+                                    result = await db.execute(select(Tag).where(Tag.name == label))
+                                    existing_tag = result.scalar_one()
+                                    tag_id = existing_tag.tag_id
+                            else:
+                                tag_id = existing_tag.tag_id
+
+                            # Create PhotoTag
+                            # Check exists first to be safe
+                            link_res = await db.execute(select(PhotoTag).where(
+                                PhotoTag.photo_id == photo.photo_id,
+                                PhotoTag.tag_id == tag_id
+                            ))
+                            if not link_res.scalar_one_or_none():
+                                pt = PhotoTag(photo_id=photo.photo_id, tag_id=tag_id, confidence=score)
+                                db.add(pt)
+
+                    print(f"Classification complete.")
+                    
+                except ImportError:
+                    print("Transformers/Torch not installed. Skipping scene detection.")
+                except Exception as e:
+                    print(f"Error in scene detection: {e}")
+
+                # 4b. Filename Fallback (if no EXIF date)
+                if not photo.taken_at:
+                    # ... (keep existing filename logic)
+                    import re
+                    # ... (rest of filename logic)
+                    wa_pattern = re.search(r"(\d{4}-\d{2}-\d{2}) at (\d{2}\.\d{2}\.\d{2})", photo.filename)
+                    if wa_pattern:
                         try:
-                            # Verify years are reasonable (e.g. 2000-2099)
-                            if 2000 <= int(compact_pattern.group(1)) <= 2099:
-                                filename_date = datetime(
-                                    int(compact_pattern.group(1)),
-                                    int(compact_pattern.group(2)),
-                                    int(compact_pattern.group(3)),
-                                    int(compact_pattern.group(4)),
-                                    int(compact_pattern.group(5)),
-                                    int(compact_pattern.group(6))
-                                )
-                                print(f"Extracted date from compact filename: {filename_date}")
+                            date_str = wa_pattern.group(1)
+                            time_str = wa_pattern.group(2).replace('.', ':')
+                            photo.taken_at = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M:%S")
                         except ValueError:
                             pass
+                    
+                    if not photo.taken_at:
+                        compact_pattern = re.search(r"(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})", photo.filename)
+                        if compact_pattern:
+                            try:
+                                if 2000 <= int(compact_pattern.group(1)) <= 2099:
+                                    photo.taken_at = datetime(
+                                        int(compact_pattern.group(1)),
+                                        int(compact_pattern.group(2)),
+                                        int(compact_pattern.group(3)),
+                                        int(compact_pattern.group(4)),
+                                        int(compact_pattern.group(5)),
+                                        int(compact_pattern.group(6))
+                                    )
+                            except ValueError:
+                                pass
 
                 # Update DB
                 photo.size_bytes = size_bytes
@@ -227,11 +417,6 @@ def process_upload(self, upload_id: str, photo_id: str):
                 if phash >= 2**63:
                     phash -= 2**64
                 photo.phash = phash
-                
-                # Update taken_at if found in filename and not already set (EXIF would set it if implemented, but we aren't doing full EXIF here yet)
-                # TODO: Implement full EXIF extraction. For now, filename fallback is good.
-                if filename_date:
-                    photo.taken_at = filename_date
                 
                 photo.processed_at = datetime.utcnow()
                 

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import './Auth.css'
 
@@ -10,6 +10,9 @@ export default function Register() {
     const [error, setError] = useState('')
     const [loading, setLoading] = useState(false)
     const { register } = useAuth()
+    const navigate = useNavigate()
+    const location = useLocation()
+    const from = location.state?.from?.pathname || '/'
 
     const handleSubmit = async (e) => {
         e.preventDefault()
@@ -25,6 +28,7 @@ export default function Register() {
 
         try {
             await register(email, password, fullName)
+            navigate(from, { replace: true })
         } catch (err) {
             setError(err.response?.data?.detail || 'Registration failed. Please try again.')
         } finally {

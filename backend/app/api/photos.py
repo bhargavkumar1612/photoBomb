@@ -112,6 +112,9 @@ class PhotoResponse(BaseModel):
     caption: Optional[str]
     favorite: bool
     archived: bool
+    gps_lat: Optional[float] = None
+    gps_lng: Optional[float] = None
+    location_name: Optional[str] = None
     thumb_urls: dict
     
     class Config:
@@ -208,6 +211,9 @@ async def list_photos(
             caption=photo.caption,
             favorite=photo.favorite,
             archived=photo.archived,
+            gps_lat=float(photo.gps_lat) if photo.gps_lat else None,
+            gps_lng=float(photo.gps_lng) if photo.gps_lng else None,
+            location_name=photo.location_name,
             thumb_urls=thumb_urls
         )
         # Dynamically attach download_url to the response object if schema supports it? 
@@ -221,6 +227,56 @@ async def list_photos(
         next_cursor=None,  # TODO: Generate cursor from last photo
         has_more=has_more
     )
+
+
+@router.get("/map", response_model=List[PhotoResponse])
+async def get_map_photos(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get all photos that have GPS coordinates.
+    Optimized for map view (lighter payload if needed, but reusing PhotoResponse for now).
+    """
+    result = await db.execute(
+        select(Photo).where(
+            Photo.user_id == current_user.user_id,
+            Photo.deleted_at == None,
+            Photo.gps_lat != None,
+            Photo.gps_lng != None,
+            Photo.storage_provider == settings.STORAGE_PROVIDER
+        )
+    )
+    photos = result.scalars().all()
+    
+    storage = get_storage_service(settings.STORAGE_PROVIDER)
+    photo_responses = []
+    
+    for photo in photos:
+        key_base = f"uploads/{current_user.user_id}/{photo.photo_id}"
+        
+        # We only need small thumbnail for map markers
+        thumb_urls = {
+            "thumb_256": storage.generate_presigned_url(f"{key_base}/thumbnails/thumb_256.jpg", expires_in=3600),
+        }
+        
+        photo_responses.append(PhotoResponse(
+            photo_id=str(photo.photo_id),
+            filename=photo.filename,
+            mime_type=photo.mime_type,
+            size_bytes=photo.size_bytes,
+            taken_at=photo.taken_at,
+            uploaded_at=photo.uploaded_at,
+            caption=photo.caption,
+            favorite=photo.favorite,
+            archived=photo.archived,
+            gps_lat=float(photo.gps_lat) if photo.gps_lat else None,
+            gps_lng=float(photo.gps_lng) if photo.gps_lng else None,
+            location_name=photo.location_name,
+            thumb_urls=thumb_urls
+        ))
+        
+    return photo_responses
 
 
 @router.get("/{photo_id}", response_model=PhotoResponse)

@@ -35,14 +35,13 @@
 - **Connection pooling**: PgBouncer (transaction mode, pool size = cores × 2)
 - **Read replicas** for analytics and search (async replication lag < 1s)
 
-### Storage Layer
-- **Primary: Backblaze B2**
+### Storage Layer (Cloudflare R2)
+- **Primary: Cloudflare R2** (S3-compatible)
   - Bucket: `photobomb-primary` (private)
-  - Lifecycle: Keep originals indefinitely, archive cold thumbnails after 90 days to cheaper tier
+  - Lifecycle: Keep originals indefinitely
   - Presigned uploads: 15-minute expiry, SHA256 checksum enforced
-- **Alternative: Cloudflare R2** (activate if reads > 10TB/month)
-  - Zero egress fees make it better for high-traffic scenarios
-- **CDN origin**: B2 with Cloudflare CDN in front (cache hit ratio target: >95%)
+- **Zero Egress Fees**: Massive cost saving for read-heavy workload.
+- **CDN**: Cloudflare integrated naturally.
 
 ### Processing Layer (K8s or server pool)
 - **Image Processing Workers**
@@ -90,30 +89,41 @@ sequenceDiagram
     FastAPI->>Queue: Enqueue job(upload_id)
     FastAPI-->>Browser: 202 Accepted
     Queue->>Worker: Process job
-    Worker->>B2: Download original
+    Worker->>R2: Download original
     Worker->>Worker: Generate thumbnails, compute hashes
-    Worker->>B2: Upload thumbnails
+    Worker->>R2: Upload thumbnails
     Worker->>Postgres: Insert metadata
     Worker->>CDN: Purge cache (if needed)
 ```
 
-### Read Flow
+### Read Flow (Secure AOT)
 ```mermaid
 sequenceDiagram
     participant Browser
-    participant CDN
+    participant iOS_App
+    participant FastAPI
     participant B2
+    participant R2
+    participant CDN
 
-    Browser->>CDN: GET /thumb/xyz.webp
+    Browser->>FastAPI: GET /api/v1/photos (list)
+    FastAPI->>R2: Generate Presigned URL (1hr)
+    FastAPI-->>Browser: JSON (includes signed image URLs)
+    
+    Browser->>CDN: GET /thumb/xyz.jpg?token=...
     alt Cache hit
-        CDN-->>Browser: 200 (from cache)
+        CDN-->>Browser: Image
     else Cache miss
-        CDN->>B2: GET object
-        B2-->>CDN: Object data
+        CDN->>R2: GET object (Authorized)
+        R2-->>CDN: Object data
         CDN->>CDN: Cache (TTL 1 year)
-        CDN-->>Browser: 200 (from origin)
+        CDN-->>Browser: Image
     end
 ```
+
+**Note**: To ensure privacy, images are NOT public. The API generates temporary presigned URLs for every image.
+- **Pros**: Zero public access, granular access control, offloads bandwidth to R2/CDN.
+- **Cons**: Client must refresh URLs when they expire (handled by re-fetching list or specific refresh endpoint).
 
 ### Search Flow (Vector Similarity)
 ```mermaid
@@ -143,12 +153,12 @@ sequenceDiagram
 - Access only from application zone via security groups
 
 ### Processing Zone (K8s Cluster)
-- Workers with B2 API access (IAM role, no hardcoded keys)
+- Workers with R2 S3-API access (Access Keys, no public access)
 - GPU nodes for face processing (optional, scale to zero when idle)
 
 ## Failure Points & Mitigation
 
-### 🔴 B2 API Rate Limits
+### 🔴 R2 API Rate Limits
 - **Risk**: 429 errors during burst uploads
 - **Mitigation**: Client-side retry with exponential backoff (2^n seconds, max 32s), queue jobs
 
@@ -175,14 +185,14 @@ sequenceDiagram
 - Streaming architecture uses ~10x less memory
 - Native WebP/AVIF support without external delegates
 
-**Why Backblaze B2 primary?**
-- $5/TB/month storage (vs R2 $15/TB, S3 $23/TB)
-- Acceptable for read-heavy if CDN cache hit ratio > 95%
-- Egress: Free up to 3x storage, then $0.01/GB (amortized via CDN)
+**Why Cloudflare R2?**
+- $15/TB/month storage (vs B2 $5/TB, S3 $23/TB)
+- **Zero Egress Fees**: This is the killer feature. For media apps, egress often exceeds storage cost.
+- **S3 Compatibility**: Standard S3 API support allows us to use mature tools (boto3).
+- **Simplicity**: One vendor (Cloudflare) for DNS, CDN, WAF, and Storage.
 
-**Tradeoff: B2 API calls ($0.004/10k Class C writes)**
-- For 1M uploads/month: ~$0.40 in API costs (negligible)
-- Breaking point: If CDN cache miss ratio > 10% AND traffic > 10TB/month, migrate high-traffic objects to R2
+**Tradeoff: Higher Storage Cost ($15/TB vs $5/TB)**
+- Worth it because we save cost on egress compared to AWS, and avoid complexity of B2+Cloudflare bandwidth alliance setup.
 
 **Why pgvector over dedicated vector DB (Pinecone, Weaviate)?**
 - Simpler ops: one DB instead of two

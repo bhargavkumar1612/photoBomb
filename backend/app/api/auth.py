@@ -434,4 +434,39 @@ async def get_current_user_or_token(
     return user
 
 
+async def get_optional_current_user(
+    authorization: Optional[str] = Header(None),
+    db: AsyncSession = Depends(get_db)
+) -> Optional[User]:
+    """
+    Get current user if authenticated, otherwise return None.
+    Does NOT raise HTTPException.
+    """
+    if not authorization:
+        return None
+        
+    try:
+        scheme, _, token = authorization.partition(" ")
+        if scheme.lower() != "bearer" or not token:
+            return None
+            
+        payload = decode_token(token)
+        if not payload:
+            return None
+            
+        user_id = payload.get("sub")
+        if not user_id:
+            return None
+            
+        result = await db.execute(select(User).where(User.user_id == user_id))
+        user = result.scalar_one_or_none()
+        
+        if not user or user.deleted_at:
+            return None
+            
+        return user
+    except Exception:
+        return None
+
+
 
