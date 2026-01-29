@@ -49,7 +49,8 @@ cd ..
 # Start Celery Worker
 echo "👷 Starting Celery Worker..."
 cd backend
-celery -A app.celery_app worker --loglevel=info -Q high,low,celery &
+export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
+celery -A app.celery_app worker --loglevel=info --pool=solo -Q high,low,celery &
 WORKER_PID=$!
 cd ..
 

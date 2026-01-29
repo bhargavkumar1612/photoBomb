@@ -41,5 +41,16 @@ celery_app.conf.update(
 # celery_app.autodiscover_tasks(['app.workers'])
 celery_app.conf.imports = [
     'app.workers.thumbnail_worker',
+    'app.workers.db_keepalive_worker',
     # 'app.workers.face_worker', # Uncomment when face worker is ready
 ]
+
+from celery.schedules import crontab
+
+celery_app.conf.beat_schedule = {
+    'keep-db-alive-every-2-hours': {
+        'task': 'app.workers.db_keepalive_worker.keep_db_alive',
+        'schedule': crontab(hour='*/2'),
+    },
+}
+

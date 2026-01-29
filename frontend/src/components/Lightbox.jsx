@@ -27,22 +27,47 @@ export default function Lightbox({ photo, photos, onClose, onNavigate }) {
     }, [currentIndex])
 
     // Pre-cache surrounding images (+/- 5)
+    // Pre-cache surrounding images (+/- 5) sequentially to avoid network stress
     useEffect(() => {
         if (!photos || photos.length === 0) return
-        const token = localStorage.getItem('access_token')
         const apiBaseUrl = import.meta.env.VITE_API_URL || '/api/v1'
+        let isCancelled = false
 
-        const preloadImage = (index) => {
-            if (index >= 0 && index < photos.length) {
+        // Create a prioritization queue: immediate neighbors first, then further out
+        const queue = []
+        for (let i = 1; i <= 5; i++) {
+            if (currentIndex + i < photos.length) queue.push(currentIndex + i)
+            if (currentIndex - i >= 0) queue.push(currentIndex - i)
+        }
+
+        const processQueue = async () => {
+            if (isCancelled || queue.length === 0) return
+
+            const index = queue.shift()
+            const photo = photos[index]
+            const src = photo.thumb_urls.original || `${apiBaseUrl}/photos/${photo.photo_id}/download`
+
+            // Load one image
+            await new Promise((resolve) => {
                 const img = new Image()
-                const photo = photos[index]
-                img.src = photo.thumb_urls.original || `${apiBaseUrl}/photos/${photo.photo_id}/download`
+                img.onload = resolve
+                img.onerror = resolve // Continue even if error
+                img.src = src
+
+                // Safety timeout to prevent stalling the queue
+                setTimeout(resolve, 2000)
+            })
+
+            // Proceed to next if not cancelled
+            if (!isCancelled) {
+                processQueue()
             }
         }
 
-        for (let i = 1; i <= 5; i++) {
-            preloadImage(currentIndex + i)
-            preloadImage(currentIndex - i)
+        processQueue()
+
+        return () => {
+            isCancelled = true
         }
     }, [currentIndex, photos])
 

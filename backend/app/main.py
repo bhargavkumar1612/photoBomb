@@ -55,8 +55,11 @@ app.include_router(upload.router, prefix="/api/v1/upload", tags=["upload"])
 app.include_router(photos.router, prefix="/api/v1/photos", tags=["photos"])
 app.include_router(albums.router, prefix="/api/v1/albums", tags=["albums"])
 app.include_router(sharing.router, prefix="/api/v1", tags=["sharing"])
-from app.api import people
+from app.api import people, tags, animals, hashtags as hashtags_api
 app.include_router(people.router, prefix="/api/v1/people", tags=["people"])
+app.include_router(animals.router, prefix="/api/v1/animals", tags=["animals"])
+app.include_router(hashtags_api.router, prefix="/api/v1/hashtags", tags=["hashtags"])
+app.include_router(tags.router, prefix="/api/v1/tags", tags=["tags"])
 
 
 @app.get("/")

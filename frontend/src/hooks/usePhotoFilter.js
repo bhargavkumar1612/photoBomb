@@ -15,7 +15,8 @@ export function usePhotoFilter(photos) {
             result = result.filter(p =>
                 p.filename.toLowerCase().includes(term) ||
                 (p.caption && p.caption.toLowerCase().includes(term)) ||
-                (p.location_name && p.location_name.toLowerCase().includes(term))
+                (p.location_name && p.location_name.toLowerCase().includes(term)) ||
+                (p.tags && p.tags.some(tag => tag.toLowerCase().includes(term)))
             )
         }
 

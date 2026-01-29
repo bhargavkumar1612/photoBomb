@@ -14,10 +14,67 @@ except (ImportError, OSError):
 import hashlib
 import imagehash
 from PIL import Image, ImageOps
+try:
+    import pillow_avif
+except ImportError:
+    pass
 from typing import Tuple
 import os
 import tempfile
 from datetime import datetime
+from app.core.config import settings
+import asyncio
+from sqlalchemy import select
+from app.models.photo import Photo
+from app.core.database import AsyncSessionLocal
+import numpy as np
+from app.services.animal_detector import detect_animals, get_animal_embedding
+from app.models.animal import AnimalDetection
+
+# Global cache for models to avoid reloading on every task
+_model_cache = {
+    "face_recognition": None,
+    "scene_classifier": None,
+    "scene_classifier_error": None,
+    "face_recognition_error": None
+}
+
+def get_face_recognition():
+    """Lazy load face_recognition library"""
+    if _model_cache["face_recognition"]:
+        return _model_cache["face_recognition"]
+    
+    if _model_cache["face_recognition_error"]:
+        raise _model_cache["face_recognition_error"]
+        
+    try:
+        import face_recognition
+        _model_cache["face_recognition"] = face_recognition
+        return face_recognition
+    except ImportError as e:
+        _model_cache["face_recognition_error"] = e
+        raise e
+
+def get_scene_classifier():
+    """Lazy load transformers pipeline"""
+    if _model_cache["scene_classifier"]:
+        return _model_cache["scene_classifier"]
+
+    if _model_cache["scene_classifier_error"]:
+        raise _model_cache["scene_classifier_error"]
+
+    try:
+        from transformers import pipeline
+        print("Loading CLIP model for scene classification... (this happens once per worker)")
+        # Check if we should use CPU explicitly to avoid MPS issues if that's the cause, 
+        # but usually defaults are fine.
+        classifier = pipeline("zero-shot-image-classification", model="openai/clip-vit-base-patch32")
+        _model_cache["scene_classifier"] = classifier
+        return classifier
+    except Exception as e:
+        print(f"Failed to load scene classifier: {e}")
+        _model_cache["scene_classifier_error"] = e
+        raise e
 
 
 
@@ -99,6 +156,48 @@ def _generate_thumbnail_pil(input_path, output_path, size, format) -> Tuple[int,
         return img.size
 
 
+def save_crop(storage, image_path, box, dest_key, padding=0.2):
+    """
+    Crop area from image and upload to storage.
+    box: (top, right, bottom, left) for consistency with face_recognition
+    """
+    try:
+        with Image.open(image_path) as img:
+            width, height = img.size
+            top, right, bottom, left = box
+            
+            # Ensure within bounds
+            top = max(0, top)
+            right = min(width, right)
+            bottom = min(height, bottom)
+            left = max(0, left)
+            
+            # Padding
+            w = right - left
+            h = bottom - top
+            top = max(0, int(top - h * padding))
+            bottom = min(height, int(bottom + h * padding))
+            left = max(0, int(left - w * padding))
+            right = min(width, int(right + w * padding))
+            
+            crop = img.crop((left, top, right, bottom))
+            crop.thumbnail((512, 512)) # Higher res for crops
+            
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
+                crop_path = tmp.name
+                
+            crop.save(crop_path, "JPEG", quality=90)
+            
+            with open(crop_path, 'rb') as f:
+                storage.upload_bytes(f.read(), dest_key, content_type='image/jpeg')
+            
+            os.unlink(crop_path)
+            return True
+    except Exception as e:
+        print(f"Error saving crop to {dest_key}: {e}")
+        return False
+
+
 class CallbackTask(Task):
     """Base task with database session."""
     
@@ -112,15 +211,10 @@ def process_upload(self, upload_id: str, photo_id: str):
     """
     Process uploaded photo: generate thumbnails, computed hashes, extract EXIF.
     """
-    import asyncio
-    from app.core.database import AsyncSessionLocal
-    from sqlalchemy import select
-    from app.models.photo import Photo
-    import os
-    
     async def _process():
         async with AsyncSessionLocal() as db:
             # 1. Fetch photo to get user_id and filename
+            # Use unique execution to avoid connection pool issues
             result = await db.execute(select(Photo).where(Photo.photo_id == photo_id))
             photo = result.scalar_one_or_none()
             
@@ -136,8 +230,8 @@ def process_upload(self, upload_id: str, photo_id: str):
                 print(f"Worker using provider: {photo.storage_provider} for photo {photo.photo_id}")
                 storage = get_storage_service(photo.storage_provider)
                 
-                source_key = f"uploads/{photo.user_id}/{upload_id}/original/{photo.filename}"
-                dest_key = f"uploads/{photo.user_id}/{photo.photo_id}/original/{photo.filename}"
+                source_key = f"{settings.STORAGE_PATH_PREFIX}/{photo.user_id}/{upload_id}/original/{photo.filename}"
+                dest_key = f"{settings.STORAGE_PATH_PREFIX}/{photo.user_id}/{photo.photo_id}/original/{photo.filename}"
                 
                 # Download
                 print(f"Downloading from {source_key}")
@@ -161,7 +255,7 @@ def process_upload(self, upload_id: str, photo_id: str):
                 
                 sizes = [256, 512, 1024]
                 for size in sizes:
-                    thumb_key = f"uploads/{photo.user_id}/{photo.photo_id}/thumbnails/thumb_{size}.jpg"
+                    thumb_key = f"{settings.STORAGE_PATH_PREFIX}/{photo.user_id}/{photo.photo_id}/thumbnails/thumb_{size}.jpg"
                     
                     with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as thumb_tmp:
                         thumb_path = thumb_tmp.name
@@ -255,9 +349,9 @@ def process_upload(self, upload_id: str, photo_id: str):
                         print(f"Error parsing GPS: {e}")
 
                 # 4c. Face Recognition
+                # 4c. Face Recognition
                 try:
-                    import face_recognition
-                    import numpy as np
+                    face_recognition = get_face_recognition()
                     from app.models.person import Face
                     
                     # Convert PIL Image to RGB and then to numpy array
@@ -268,10 +362,6 @@ def process_upload(self, upload_id: str, photo_id: str):
                         else:
                             rgb_img = img
                         
-                        # Resize for faster processing if image is huge (optional, but recommended for speed)
-                        # face_recognition works best on moderate sizes, but for accuracy on high-res, full size is better but slower.
-                        # Let's keep full size for now or cap at 1600px max dimension?
-                        # For now, just use original.
                         np_image = np.array(rgb_img)
                         
                     print(f"Detecting faces in {photo.filename}...")
@@ -294,91 +384,170 @@ def process_upload(self, upload_id: str, photo_id: str):
                                 location_left=left
                             )
                             db.add(new_face)
-                            # Note: We are NOT assigning person_id yet. That happens in clustering step.
+                            await db.flush() # Get face_id
+                            
+                            # Save facial crop
+                            face_key = f"{settings.STORAGE_PATH_PREFIX}/{photo.user_id}/faces/{new_face.face_id}.jpg"
+                            save_crop(storage, tmp_path, (top, right, bottom, left), face_key, padding=0.4)
                             
                 except ImportError:
                     print("Face recognition libraries not found/installed. Skipping.")
                 except Exception as e:
                     print(f"Error in face recognition: {e}")
 
-                # 4d. Object & Scene Detection (CLIP)
+                # 4d. Animal Detection (DETR + CLIP)
                 try:
-                    from transformers import pipeline
-                    from app.models.tag import Tag, PhotoTag
-                    from app.core.database import AsyncSessionLocal
-                    from sqlalchemy import select
+                    print(f"Detecting animals in {photo.filename}...")
+                    detections = detect_animals(tmp_path, threshold=0.7)
+                    print(f"Found {len(detections)} animals")
+                    
+                    for det in detections:
+                        # DETR box: [xmin, ymin, xmax, ymax]
+                        # Convert to (top, right, bottom, left) for save_crop
+                        xmin, ymin, xmax, ymax = det['box']
+                        box = (int(ymin), int(xmax), int(ymax), int(xmin))
+                        
+                        embedding = get_animal_embedding(tmp_path, det['box'])
+                        
+                        new_det = AnimalDetection(
+                            photo_id=photo.photo_id,
+                            label=det['label'],
+                            confidence=det['confidence'],
+                            embedding=embedding,
+                            location_top=box[0],
+                            location_right=box[1],
+                            location_bottom=box[2],
+                            location_left=box[3]
+                        )
+                        db.add(new_det)
+                        await db.flush()
+                        
+                        # Save animal crop
+                        animal_key = f"{settings.STORAGE_PATH_PREFIX}/{photo.user_id}/animals/crops/{new_det.detection_id}.jpg"
+                        save_crop(storage, tmp_path, box, animal_key, padding=0.1)
 
-                    # Labels
-                    candidate_labels = [
-                        "animal", "dog", "cat", "bird", "wildlife",
-                        "document", "receipt", "invoice", "id card", "paper",
-                        "nature", "beach", "mountain", "forest", "sunset", "sky",
-                        "city", "architecture", "street", "building",
-                        "food", "drink", "meal",
-                        "vehicle", "car", "bicycle", "plane",
-                        "screenshot", "text", "diagram"
-                    ]
+                        # 2. ALSO ADD AS TAG (Special request for #dog search)
+                        animal_tag_name = det['label'].lower().replace(" ", "")
+                        tag_stmt = await db.execute(select(Tag).where(Tag.name == animal_tag_name))
+                        animal_tag = tag_stmt.scalar_one_or_none()
+                        
+                        if not animal_tag:
+                            try:
+                                animal_tag = Tag(name=animal_tag_name, category="animals")
+                                db.add(animal_tag)
+                                await db.flush()
+                            except Exception:
+                                # Race condition
+                                await db.rollback()
+                                tag_stmt = await db.execute(select(Tag).where(Tag.name == animal_tag_name))
+                                animal_tag = tag_stmt.scalar_one()
+
+                        # Link photo to tag if not exists
+                        link_res = await db.execute(select(PhotoTag).where(
+                            PhotoTag.photo_id == photo.photo_id,
+                            PhotoTag.tag_id == animal_tag.tag_id
+                        ))
+                        if not link_res.scalar_one_or_none():
+                            pt = PhotoTag(photo_id=photo.photo_id, tag_id=animal_tag.tag_id, confidence=det['confidence'])
+                            db.add(pt)
+                except Exception as e:
+                    print(f"Error in animal detection: {e}")
+
+                # 4e. Object & Scene Detection (CLIP)
+                # 4d. Object & Scene Detection (CLIP)
+                # 4d. Object & Scene Detection (CLIP)
+                from app.services.classifier import classify_image
+                from app.services.document_classifier import classify_document
+                from app.models.tag import Tag, PhotoTag
+
+                print(f"Classifying scene in {photo.filename}...")
+                
+                # Call service
+                classification_results = classify_image(tmp_path, threshold=0.4)
+                
+                for res in classification_results:
+                    label = res['label']
+                    score = res['score']
+                    category = res['category']
                     
-                    print(f"Classifying scene in {photo.filename}...")
+                    # Check existing tag
+                    result = await db.execute(select(Tag).where(Tag.name == label))
+                    existing_tag = result.scalar_one_or_none()
                     
-                    # Use 'zero-shot-image-classification'
-                    # Model: 'openai/clip-vit-base-patch32'
-                    classifier = pipeline("zero-shot-image-classification", model="openai/clip-vit-base-patch32")
+                    tag_id = None
+                    if not existing_tag:
+                        try:
+                            new_tag = Tag(name=label, category=category)
+                            db.add(new_tag)
+                            await db.flush()
+                            tag_id = new_tag.tag_id
+                        except Exception: 
+                            # Race condition likely
+                            await db.rollback()
+                            result = await db.execute(select(Tag).where(Tag.name == label))
+                            existing_tag = result.scalar_one()
+                            tag_id = existing_tag.tag_id
+                    else:
+                        tag_id = existing_tag.tag_id
+                        # Update category if "general"
+                        if existing_tag.category == "general" and category != "general":
+                            existing_tag.category = category
+                            db.add(existing_tag)
+
+                    # Create PhotoTag
+                    link_res = await db.execute(select(PhotoTag).where(
+                        PhotoTag.photo_id == photo.photo_id,
+                        PhotoTag.tag_id == tag_id
+                    ))
+                    if not link_res.scalar_one_or_none():
+                        pt = PhotoTag(photo_id=photo.photo_id, tag_id=tag_id, confidence=score)
+                        db.add(pt)
+
+                # 2. Granular Document Classification (Second Pass)
+                if any(res['category'] == 'documents' for res in classification_results):
+                    print(f"Document detected, performing granular classification...")
+                    doc_results = classify_document(tmp_path, threshold=0.3)
                     
-                    # Predict
-                    results = classifier(tmp_path, candidate_labels=candidate_labels)
-                    
-                    # Filter and save
-                    for res in results:
+                    for res in doc_results:
                         label = res['label']
                         score = res['score']
                         
-                        if score > 0.2: # Threshold
-                            # Check existing tag
-                            result = await db.execute(select(Tag).where(Tag.name == label))
-                            existing_tag = result.scalar_one_or_none()
-                            
-                            tag_id = None
-                            if not existing_tag:
-                                # Determine category
-                                category = "general"
-                                if label in ["dog", "cat", "bird", "animal", "wildlife"]:
-                                    category = "animal"
-                                elif label in ["document", "receipt", "invoice", "id card", "paper", "text", "diagram"]:
-                                    category = "document"
-                                elif label in ["nature", "beach", "mountain", "forest", "sunset", "sky", "city", "architecture", "street", "building"]:
-                                    category = "place"
-                                
-                                try:
-                                    new_tag = Tag(name=label, category=category)
-                                    db.add(new_tag)
-                                    await db.flush()
-                                    tag_id = new_tag.tag_id
-                                except Exception: 
-                                    # Race condition likely
-                                    await db.rollback()
-                                    result = await db.execute(select(Tag).where(Tag.name == label))
-                                    existing_tag = result.scalar_one()
-                                    tag_id = existing_tag.tag_id
-                            else:
+                        # Add as hashtag-style tag
+                        # Remove spaces and camelCase is better? User said #socialsecuritycard
+                        tag_name = label.lower().replace(" ", "")
+                        
+                        # Check/Create tag
+                        result = await db.execute(select(Tag).where(Tag.name == tag_name))
+                        existing_tag = result.scalar_one_or_none()
+                        
+                        tag_id = None
+                        if not existing_tag:
+                            try:
+                                new_tag = Tag(name=tag_name, category="documents")
+                                db.add(new_tag)
+                                await db.flush()
+                                tag_id = new_tag.tag_id
+                            except Exception:
+                                await db.rollback()
+                                result = await db.execute(select(Tag).where(Tag.name == tag_name))
+                                existing_tag = result.scalar_one()
                                 tag_id = existing_tag.tag_id
+                        else:
+                            tag_id = existing_tag.tag_id
+                            if not existing_tag.category:
+                                existing_tag.category = "documents"
+                                db.add(existing_tag)
 
-                            # Create PhotoTag
-                            # Check exists first to be safe
-                            link_res = await db.execute(select(PhotoTag).where(
-                                PhotoTag.photo_id == photo.photo_id,
-                                PhotoTag.tag_id == tag_id
-                            ))
-                            if not link_res.scalar_one_or_none():
-                                pt = PhotoTag(photo_id=photo.photo_id, tag_id=tag_id, confidence=score)
-                                db.add(pt)
+                        # Create PhotoTag
+                        link_res = await db.execute(select(PhotoTag).where(
+                            PhotoTag.photo_id == photo.photo_id,
+                            PhotoTag.tag_id == tag_id
+                        ))
+                        if not link_res.scalar_one_or_none():
+                            pt = PhotoTag(photo_id=photo.photo_id, tag_id=tag_id, confidence=score)
+                            db.add(pt)
 
-                    print(f"Classification complete.")
-                    
-                except ImportError:
-                    print("Transformers/Torch not installed. Skipping scene detection.")
-                except Exception as e:
-                    print(f"Error in scene detection: {e}")
+                print(f"Classification complete.")
 
                 # 4b. Filename Fallback (if no EXIF date)
                 if not photo.taken_at:
@@ -429,30 +598,13 @@ def process_upload(self, upload_id: str, photo_id: str):
                 print(f"Error processing photo {photo_id}: {e}")
                 raise e
 
-    loop = asyncio.get_event_loop()
-    if loop.is_running():
-        # Should not happen in synchronous celery worker, but just in case
-        return loop.create_task(_process())
-    else:
-        return asyncio.run(_process())
-
-    return {
-        "status": "success",
-        "photo_id": photo_id
-    }
-
-
-# Function body replaced by previous block, ensuring we don't duplicate. 
-# Actually, the previous tool call might have replaced imports but mismatched the TargetContent if I wasn't careful.
-# Let's check what I replaced. 
-# I replaced from line 7 to START of generate_thumbnail?
-# The TargetContent in previous call was "import pyvips... from app.services.b2_service import b2_service".
-# That covers imports. 
-# Now I need to delete the OLD generate_thumbnail function implementation because I redefined it in the previous block?
-# NO, I defined `generate_thumbnail` in the previous REPLACEMENT string, but I replaced the IMPORTS block.
-# So now `generate_thumbnail` is defined TWICE?
-# Yes, likely. I need to remove the old implementation.
-
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+    return loop.run_until_complete(_process())
 
 
 def compute_perceptual_hash(image_path: str) -> int:

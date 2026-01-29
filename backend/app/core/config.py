@@ -5,7 +5,6 @@ Loads settings from environment variables.
 from pydantic_settings import BaseSettings
 from typing import List
 
-
 class Settings(BaseSettings):
     """Application settings loaded from environment."""
     
@@ -19,6 +18,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     DATABASE_POOL_SIZE: int = 20
     DATABASE_MAX_OVERFLOW: int = 10
+    DB_SCHEMA: str = "photobomb"
     
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
@@ -48,6 +48,7 @@ class Settings(BaseSettings):
     # Storage
     DEFAULT_STORAGE_QUOTA_GB: int = 100
     MAX_FILE_SIZE_MB: int = 50
+    STORAGE_PATH_PREFIX: str = "uploads"  # Override via env var (e.g. "uploads/dev")
     
     # Face Recognition
     FACE_RECOGNITION_ENABLED: bool = True

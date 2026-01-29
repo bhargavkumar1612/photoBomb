@@ -37,7 +37,7 @@ class B2NativeService:
     ) -> Dict[str, Any]:
         self.authorize()
         bucket = self.get_bucket()
-        b2_key = f"uploads/{user_id}/{upload_id}/original/{filename}"
+        b2_key = f"{settings.STORAGE_PATH_PREFIX}/{user_id}/{upload_id}/original/{filename}"
         
         auth_token = self.info.get_account_auth_token()
         api_url = self.info.get_api_url()
@@ -168,3 +168,14 @@ class B2NativeService:
             if len(files) >= max_files:
                 break
         return files
+
+    def file_exists(self, key: str) -> bool:
+        """Check if file exists in storage."""
+        self.authorize()
+        bucket = self.get_bucket()
+        # B2 Native doesn't have a direct 'head' by name without listing versions or knowing IDs.
+        # But ls with specific name prefix works.
+        for file_version, _ in bucket.ls(folder_to_list=key, recursive=False):
+            if file_version.file_name == key:
+                return True
+        return False

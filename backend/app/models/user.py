@@ -8,6 +8,7 @@ from sqlalchemy.sql import func
 import uuid
 
 from app.core.database import Base
+from app.core.config import settings
 
 
 class User(Base):
@@ -19,7 +20,7 @@ class User(Base):
             "email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}$'",
             name='email_format'
         ),
-        {'schema': 'photobomb'}
+        {'schema': settings.DB_SCHEMA}
     )
     
     user_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -47,7 +48,7 @@ class User(Base):
     # Relationships
     photos = relationship("Photo", back_populates="user", cascade="all, delete-orphan")
     albums = relationship("Album", back_populates="user", cascade="all, delete-orphan")
-    shared_albums = relationship("Album", secondary="photobomb.album_contributors", back_populates="contributors")
+    shared_albums = relationship("Album", secondary=f"{settings.DB_SCHEMA}.album_contributors", back_populates="contributors")
     
     def __repr__(self):
         return f"<User {self.email}>"

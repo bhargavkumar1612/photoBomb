@@ -8,14 +8,15 @@ from datetime import datetime
 import uuid
 
 from app.core.database import Base
+from app.core.config import settings
 
 class ShareLink(Base):
     """ShareLink model for public sharing of albums"""
     __tablename__ = "share_links"
-    __table_args__ = {'schema': 'photobomb'}
+    __table_args__ = {'schema': settings.DB_SCHEMA}
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    album_id = Column(UUID(as_uuid=True), ForeignKey('photobomb.albums.album_id', ondelete='CASCADE'), nullable=False, index=True)
+    album_id = Column(UUID(as_uuid=True), ForeignKey(f'{settings.DB_SCHEMA}.albums.album_id', ondelete='CASCADE'), nullable=False, index=True)
     
     # The secure token used in the URL
     token = Column(String(64), unique=True, nullable=False, index=True)
@@ -40,11 +41,11 @@ class ShareLink(Base):
 class ShareLinkView(Base):
     """Model to track individual views of shared links"""
     __tablename__ = "share_link_views"
-    __table_args__ = {'schema': 'photobomb'}
+    __table_args__ = {'schema': settings.DB_SCHEMA}
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    share_link_id = Column(UUID(as_uuid=True), ForeignKey('photobomb.share_links.id', ondelete='CASCADE'), nullable=False, index=True)
-    user_id = Column(UUID(as_uuid=True), ForeignKey('photobomb.users.user_id', ondelete='SET NULL'), nullable=True) # If viewer is logged in
+    share_link_id = Column(UUID(as_uuid=True), ForeignKey(f'{settings.DB_SCHEMA}.share_links.id', ondelete='CASCADE'), nullable=False, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey(f'{settings.DB_SCHEMA}.users.user_id', ondelete='SET NULL'), nullable=True) # If viewer is logged in
     
     # Optional: track IP hash or similar for anon views, but strictly user_id requested for "Who viewed"
     ip_hash = Column(String(64), nullable=True) 
@@ -54,4 +55,3 @@ class ShareLinkView(Base):
     # Relationships
     share_link = relationship("ShareLink", back_populates="views_detail")
     user = relationship("User") # To show who viewed
-

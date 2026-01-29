@@ -8,6 +8,7 @@ from sqlalchemy.orm import relationship
 import uuid
 
 from app.core.database import Base
+from app.core.config import settings
 
 
 class Photo(Base):
@@ -16,7 +17,7 @@ class Photo(Base):
     __tablename__ = "photos"
     
     photo_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("photobomb.users.user_id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey(f"{settings.DB_SCHEMA}.users.user_id", ondelete="CASCADE"), nullable=False)
     
     # File metadata
     filename = Column(String(500), nullable=False)
@@ -60,8 +61,9 @@ class Photo(Base):
     
     # Relationships
     user = relationship("User", back_populates="photos")
-    albums = relationship("Album", secondary="photobomb.album_photos", back_populates="photos")
+    albums = relationship("Album", secondary=f"{settings.DB_SCHEMA}.album_photos", back_populates="photos")
     files = relationship("PhotoFile", back_populates="photo", cascade="all, delete-orphan")
+    visual_tags = relationship("Tag", secondary=f"{settings.DB_SCHEMA}.photo_tags", backref="photos_list", overlaps="photo_tags,tags,photo,tag")
     
     __table_args__ = (
         CheckConstraint(
@@ -73,7 +75,7 @@ class Photo(Base):
         Index('idx_photos_user_uploaded', 'user_id', 'uploaded_at', postgresql_where="deleted_at IS NULL"),
         Index('idx_photos_favorite', 'user_id', 'uploaded_at', postgresql_where="favorite = true AND deleted_at IS NULL"),
         Index('idx_photos_user_deleted', 'user_id', 'deleted_at', postgresql_where="deleted_at IS NOT NULL"),
-        {'schema': 'photobomb'}
+        {'schema': settings.DB_SCHEMA}
     )
     
     def __repr__(self):
@@ -86,7 +88,7 @@ class PhotoFile(Base):
     __tablename__ = "photo_files"
     
     file_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    photo_id = Column(UUID(as_uuid=True), ForeignKey("photobomb.photos.photo_id", ondelete="CASCADE"), nullable=False)
+    photo_id = Column(UUID(as_uuid=True), ForeignKey(f"{settings.DB_SCHEMA}.photos.photo_id", ondelete="CASCADE"), nullable=False)
     
     variant = Column(String(50), nullable=False)  # 'original', 'thumb_256', etc.
     format = Column(String(10), nullable=False)  # 'jpeg', 'webp', 'avif'
@@ -109,7 +111,7 @@ class PhotoFile(Base):
     __table_args__ = (
         Index('idx_photo_files_photo', 'photo_id'),
         Index('idx_photo_files_unique', 'photo_id', 'variant', 'format', unique=True),
-        {'schema': 'photobomb'}
+        {'schema': settings.DB_SCHEMA}
     )
     
     def __repr__(self):

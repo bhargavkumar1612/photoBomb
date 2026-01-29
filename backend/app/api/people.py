@@ -14,6 +14,11 @@ from app.services.face_clustering import cluster_faces
 
 router = APIRouter()
 
+from app.api.photos import PhotoResponse
+from sqlalchemy import desc
+from app.models.tag import PhotoTag # Ensure models are available if needed, though we use Face/Person
+
+
 from pydantic import BaseModel
 
 class PersonResponse(BaseModel):
@@ -39,7 +44,9 @@ async def trigger_clustering(
     background_tasks.add_task(cluster_faces, current_user.user_id)
     return {"message": "Clustering started in background"}
 
-@router.get("/", response_model=List[PersonResponse])
+from sqlalchemy.orm import selectinload
+
+@router.get("", response_model=List[PersonResponse])
 async def list_people(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
@@ -48,18 +55,14 @@ async def list_people(
     List all people found for the user.
     """
     # Join with Face to get count, and also get cover face URL
-    # This query might be complex.
-    # Group by person.
-    
-    # Simple approach: Fetch people and eager load or separate query for counts?
-    # Subquery for counts is efficient.
     
     stmt = (
         select(
             Person,
-            func.count(Face.face_id).label("face_count")
+            func.count(func.distinct(Face.photo_id)).label("face_count")
         )
         .join(Face, Face.person_id == Person.person_id)
+        .options(selectinload(Person.cover_face).selectinload(Face.photo))
         .where(Person.user_id == current_user.user_id)
         .group_by(Person.person_id)
         .order_by(desc("face_count"))
@@ -70,34 +73,19 @@ async def list_people(
     
     response = []
     
-    # We need to fetch cover photo URLs. 
-    # Person has cover_face_id -> Face -> Photo
-    # We can lazy load or do a big join.
-    # Let's iterate and fetch for now (N+1 query risk but acceptable for MVP with small N people)
-    # Alternatively, join in the main query.
-    
     from app.services.storage_factory import get_storage_service
     from app.core.config import settings
     storage = get_storage_service(settings.STORAGE_PROVIDER)
 
     for person, count in people_with_counts:
         cover_url = None
-        if person.cover_face_id:
-             # Fetch the face to get the photo
-             # Use explicit query to avoid lazy load issues in async
-             # Actually, we can use `person.cover_face` relationship if we joined or selectinloaded it.
-             # But here we didn't.
-             res = await db.execute(
-                 select(Face).where(Face.face_id == person.cover_face_id).join(Photo)
-             )
-             cover_face = res.scalar_one_or_none()
-             
-             if cover_face and cover_face.photo:
-                  key_base = f"uploads/{current_user.user_id}/{cover_face.photo.photo_id}"
-                  # We should create a face crop thumbnail ideally.
-                  # For now, use the 256 thumb of the photo.
-                  cover_url = storage.generate_presigned_url(f"{key_base}/thumbnails/thumb_256.jpg", expires_in=3600)
+        cover_face = person.cover_face
         
+        if cover_face and cover_face.photo:
+            # Use the face crop
+            key = f"{settings.STORAGE_PATH_PREFIX}/{current_user.user_id}/faces/{cover_face.face_id}.jpg"
+            cover_url = storage.generate_presigned_url(key, expires_in=3600)
+            
         response.append(PersonResponse(
             person_id=person.person_id,
             name=person.name,
@@ -121,7 +109,7 @@ async def get_person(
         raise HTTPException(status_code=404, detail="Person not found")
         
     # Get count
-    count_res = await db.execute(select(func.count(Face.face_id)).where(Face.person_id == person_id))
+    count_res = await db.execute(select(func.count(func.distinct(Face.photo_id))).where(Face.person_id == person_id))
     count = count_res.scalar()
     
     # Get cover
@@ -132,12 +120,15 @@ async def get_person(
     cover_url = None
     if person.cover_face_id:
          res = await db.execute(
-             select(Face).where(Face.face_id == person.cover_face_id).join(Photo)
+             select(Face)
+             .options(selectinload(Face.photo))
+             .where(Face.face_id == person.cover_face_id)
          )
          cover_face = res.scalar_one_or_none()
          if cover_face and cover_face.photo:
-              key_base = f"uploads/{current_user.user_id}/{cover_face.photo.photo_id}"
-              cover_url = storage.generate_presigned_url(f"{key_base}/thumbnails/thumb_256.jpg", expires_in=3600)
+              # Use the face crop
+              key = f"{settings.STORAGE_PATH_PREFIX}/{current_user.user_id}/faces/{cover_face.face_id}.jpg"
+              cover_url = storage.generate_presigned_url(key, expires_in=3600)
 
     return PersonResponse(
         person_id=person.person_id,
@@ -145,6 +136,72 @@ async def get_person(
         face_count=count,
         cover_photo_url=cover_url
     )
+
+@router.get("/{person_id}/photos", response_model=List[PhotoResponse])
+async def list_person_photos(
+    person_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    List all photos containing the specified person.
+    """
+    # Verify person exists and belongs to user
+    result = await db.execute(
+        select(Person).where(Person.person_id == person_id, Person.user_id == current_user.user_id)
+    )
+    person = result.scalar_one_or_none()
+    if not person:
+        raise HTTPException(status_code=404, detail="Person not found")
+
+    # Join Face -> Photo
+    stmt = (
+        select(Photo)
+        .distinct()
+        .join(Face, Face.photo_id == Photo.photo_id)
+        .where(
+            Face.person_id == person_id,
+            Photo.deleted_at == None
+        )
+        .order_by(desc(Photo.taken_at))
+    )
+    
+    result = await db.execute(stmt)
+    photos = result.scalars().all()
+    
+    response = []
+    
+    from app.services.storage_factory import get_storage_service
+    from app.core.config import settings
+    storage = get_storage_service(settings.STORAGE_PROVIDER)
+
+    for photo in photos:
+        key_base = f"{settings.STORAGE_PATH_PREFIX}/{current_user.user_id}/{photo.photo_id}"
+        
+        thumb_urls = {
+            "thumb_256": storage.generate_presigned_url(f"{key_base}/thumbnails/thumb_256.jpg", expires_in=3600),
+            "thumb_512": storage.generate_presigned_url(f"{key_base}/thumbnails/thumb_512.jpg", expires_in=3600),
+            "thumb_1024": storage.generate_presigned_url(f"{key_base}/thumbnails/thumb_1024.jpg", expires_in=3600),
+            "original": storage.generate_presigned_url(f"{key_base}/original/{photo.filename}", expires_in=3600)
+        }
+        
+        response.append(PhotoResponse(
+            photo_id=str(photo.photo_id),
+            filename=photo.filename,
+            mime_type=photo.mime_type,
+            size_bytes=photo.size_bytes,
+            taken_at=photo.taken_at,
+            uploaded_at=photo.uploaded_at,
+            caption=photo.caption,
+            favorite=photo.favorite,
+            archived=photo.archived,
+            gps_lat=float(photo.gps_lat) if photo.gps_lat else None,
+            gps_lng=float(photo.gps_lng) if photo.gps_lng else None,
+            location_name=photo.location_name,
+            thumb_urls=thumb_urls
+        ))
+        
+    return response
 
 @router.patch("/{person_id}", response_model=PersonResponse)
 async def update_person(

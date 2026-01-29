@@ -4,9 +4,11 @@ Photos API endpoints for CRUD operations.
 from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Response, BackgroundTasks
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, update, delete
+import sqlalchemy as sa
 from pydantic import BaseModel
-from typing import Optional, List
+from sqlalchemy.orm import selectinload
+from typing import Optional, List, Dict
 from datetime import datetime
 import io
 import uuid
@@ -49,7 +51,7 @@ async def download_photo(
         )
     
     storage = get_storage_service(photo.storage_provider)
-    b2_key = f"uploads/{current_user_id}/{photo.photo_id}/original/{photo.filename}"
+    b2_key = f"{settings.STORAGE_PATH_PREFIX}/{current_user_id}/{photo.photo_id}/original/{photo.filename}"
     
     # Generate presigned download URL
     download_url = storage.generate_presigned_url(b2_key, expires_in=3600)
@@ -89,7 +91,7 @@ async def get_thumbnail(
         )
     
     storage = get_storage_service(photo.storage_provider)
-    thumb_key = f"uploads/{current_user_id}/{photo_id}/thumbnails/thumb_{size}.jpg"
+    thumb_key = f"{settings.STORAGE_PATH_PREFIX}/{current_user_id}/{photo_id}/thumbnails/thumb_{size}.jpg"
     
     # Generate presigned URL
     thumb_url = storage.generate_presigned_url(thumb_key, expires_in=3600)
@@ -116,6 +118,7 @@ class PhotoResponse(BaseModel):
     gps_lng: Optional[float] = None
     location_name: Optional[str] = None
     thumb_urls: dict
+    tags: List[str] = []
     
     class Config:
         from_attributes = True
@@ -138,6 +141,7 @@ async def list_photos(
     cursor: Optional[str] = Query(None, description="Pagination cursor"),
     limit: int = Query(50, ge=1, le=200),
     sort: str = Query("taken_desc", regex="^(created_desc|created_asc|taken_desc|taken_asc)$"),
+    tag: Optional[str] = Query(None, description="Filter by tag name"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
@@ -147,11 +151,19 @@ async def list_photos(
     Supports pagination with cursor and sorting options.
     """
     # Build query
-    query = select(Photo).where(
+    query = select(Photo).options(selectinload(Photo.visual_tags)).where(
         Photo.user_id == current_user.user_id,
         Photo.deleted_at == None,
         Photo.storage_provider == settings.STORAGE_PROVIDER
     )
+    
+    # Filter by tag if provided
+    if tag:
+        # Join with PhotoTag and Tag
+        from app.models.tag import Tag, PhotoTag
+        query = query.join(PhotoTag, PhotoTag.photo_id == Photo.photo_id)\
+                     .join(Tag, Tag.tag_id == PhotoTag.tag_id)\
+                     .where(Tag.name == tag)
     
     # Apply sorting
     if sort == "taken_desc":
@@ -185,7 +197,7 @@ async def list_photos(
         # storage = get_storage_service(photo.storage_provider) # Removed per strict isolation request
         
         # Construct full keys
-        key_base = f"uploads/{current_user.user_id}/{photo.photo_id}"
+        key_base = f"{settings.STORAGE_PATH_PREFIX}/{current_user.user_id}/{photo.photo_id}"
         
         # Generate generic thumbnail URLs (signed)
         thumb_urls = {
@@ -214,7 +226,8 @@ async def list_photos(
             gps_lat=float(photo.gps_lat) if photo.gps_lat else None,
             gps_lng=float(photo.gps_lng) if photo.gps_lng else None,
             location_name=photo.location_name,
-            thumb_urls=thumb_urls
+            thumb_urls=thumb_urls,
+            tags=[t.name for t in photo.visual_tags] if hasattr(photo, 'visual_tags') else []
         )
         # Dynamically attach download_url to the response object if schema supports it? 
         # Schema doesn't have it. `thumb_urls` is a dict, so I effectively added "original" key to it.
@@ -253,7 +266,7 @@ async def get_map_photos(
     photo_responses = []
     
     for photo in photos:
-        key_base = f"uploads/{current_user.user_id}/{photo.photo_id}"
+        key_base = f"{settings.STORAGE_PATH_PREFIX}/{current_user.user_id}/{photo.photo_id}"
         
         # We only need small thumbnail for map markers
         thumb_urls = {
@@ -305,7 +318,7 @@ async def get_photo(
     storage = get_storage_service(settings.STORAGE_PROVIDER)
     
     # Generate thumbnail URLs
-    key_base = f"uploads/{current_user.user_id}/{photo.photo_id}"
+    key_base = f"{settings.STORAGE_PATH_PREFIX}/{current_user.user_id}/{photo.photo_id}"
     thumb_urls = {
         "thumb_256": storage.generate_presigned_url(f"{key_base}/thumbnails/thumb_256.jpg", expires_in=3600),
         "thumb_512": storage.generate_presigned_url(f"{key_base}/thumbnails/thumb_512.jpg", expires_in=3600),
@@ -323,7 +336,8 @@ async def get_photo(
         caption=photo.caption,
         favorite=photo.favorite,
         archived=photo.archived,
-        thumb_urls=thumb_urls
+        thumb_urls=thumb_urls,
+        tags=[t.name for t in photo.visual_tags] if hasattr(photo, 'visual_tags') else []
     )
 
 
@@ -475,7 +489,7 @@ async def get_trash(
     # Build response
     photo_responses = []
     for photo in photos:
-        key_base = f"uploads/{current_user.user_id}/{photo.photo_id}"
+        key_base = f"{settings.STORAGE_PATH_PREFIX}/{current_user.user_id}/{photo.photo_id}"
         
         thumb_urls = {
             "thumb_256": storage.generate_presigned_url(f"{key_base}/thumbnails/thumb_256.jpg", expires_in=3600),
@@ -560,11 +574,11 @@ async def permanently_delete_photo(
     storage = get_storage_service(photo.storage_provider)
     try:
         # List and delete all files (original + thumbnails)
-        prefix = f"uploads/{current_user.user_id}/{photo.photo_id}"
+        prefix = f"{settings.STORAGE_PATH_PREFIX}/{current_user.user_id}/{photo.photo_id}"
         files = storage.list_files(prefix=prefix)
         for f in files:
             # delete_file expects 'key' (file_name)
-            storage.delete_file(f['file_name'])
+            storage.delete_file(f['file_id'])
             
     except Exception as e:
         print(f"Warning: Failed to delete file from Storage: {str(e)}")
@@ -583,3 +597,105 @@ async def permanently_delete_photo(
     return None
 
 
+
+class BatchPhotoRequest(BaseModel):
+    photo_ids: List[str]
+
+
+@router.post("/batch/delete", status_code=status.HTTP_204_NO_CONTENT)
+async def batch_soft_delete(
+    request: BatchPhotoRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Batch soft-delete photos."""
+    if not request.photo_ids:
+        return None
+
+    # Update deleted_at for all owned photos in the list
+    await db.execute(
+        sa.update(Photo)
+        .where(
+            Photo.photo_id.in_(request.photo_ids),
+            Photo.user_id == current_user.user_id,
+            Photo.deleted_at == None
+        )
+        .values(deleted_at=datetime.utcnow())
+    )
+    
+    await db.commit()
+    return None
+
+
+@router.post("/batch/restore", status_code=status.HTTP_200_OK)
+async def batch_restore(
+    request: BatchPhotoRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Batch restore photos from trash."""
+    if not request.photo_ids:
+        return {"status": "success", "count": 0}
+
+    result = await db.execute(
+        sa.update(Photo)
+        .where(
+            Photo.photo_id.in_(request.photo_ids),
+            Photo.user_id == current_user.user_id,
+            Photo.deleted_at != None
+        )
+        .values(deleted_at=None)
+    )
+    
+    await db.commit()
+    # rowcount for update in asyncpg: result.rowcount
+    return {"status": "restored", "count": result.rowcount}
+
+
+@router.post("/batch/permanent", status_code=status.HTTP_204_NO_CONTENT)
+async def batch_permanent_delete(
+    request: BatchPhotoRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Batch permanently delete photos from B2 and database."""
+    if not request.photo_ids:
+        return None
+
+    # Fetch photos first to get storage info
+    result = await db.execute(
+        select(Photo).where(
+            Photo.photo_id.in_(request.photo_ids),
+            Photo.user_id == current_user.user_id
+        )
+    )
+    photos = result.scalars().all()
+    
+    if not photos:
+        return None
+        
+    for photo in photos:
+        # Delete from Storage
+        storage = get_storage_service(photo.storage_provider)
+        try:
+            prefix = f"{settings.STORAGE_PATH_PREFIX}/{current_user.user_id}/{photo.photo_id}"
+            files = storage.list_files(prefix=prefix)
+            for f in files:
+                storage.delete_file(f['file_id'])
+        except Exception as e:
+            print(f"Warning: Failed to delete file for photo {photo.photo_id}: {str(e)}")
+        
+        # Update user quota
+        current_user.storage_used_bytes -= photo.size_bytes
+        if current_user.storage_used_bytes < 0:
+            current_user.storage_used_bytes = 0
+            
+    # Delete from DB
+    await db.execute(
+        sa.delete(Photo).where(
+            Photo.photo_id.in_([p.photo_id for p in photos])
+        )
+    )
+    
+    await db.commit()
+    return None

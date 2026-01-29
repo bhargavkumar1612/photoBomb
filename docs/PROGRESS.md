@@ -6,7 +6,8 @@
 
 **MVP Milestone 1**: ✅ 100% Complete (Core Upload & View)  
 **MVP Milestone 2**: ✅ 100% Complete (Face Recognition & Object Detection)  
-**Overall MVP**: ~95% Complete
+**MVP Milestone 5**: ✅ 100% Complete (Performance & Scale)  
+**Overall MVP**: ~98% Complete
 
 A production-ready photo service (PWA) with full planning documentation and working implementation.
 
@@ -28,6 +29,8 @@ A production-ready photo service (PWA) with full planning documentation and work
 - **Object & Scene Detection** (CLIP AI, automatic tagging)
 - **Advanced Sharing** (Share links, viewer tracking, contributor management)
 - **Hybrid Storage** (B2, S3, R2 support with per-photo provider tracking)
+- **Visual Hashtags** (Unified object/scene detection with optimized batch fetching)
+- **Maintainability** (Database keep-alive heartbeat via Celery)
 
 **📋 Planned:**
 - Search & Discovery (Text + Semantic)
@@ -107,7 +110,7 @@ Photos:
 - ✅ Database migrations via Alembic
 
 **Remaining:**
-- 🔄 EXIF extraction (Planned Milestone 2)
+- ✅ EXIF extraction (GPS, Camera, Date)
 
 ### 🎨 Frontend Implementation (100% Complete)
 
@@ -282,7 +285,9 @@ npm run dev
 | Search | ⏳ Planned | Milestone 2 |
 | **Place Recognition** | ✅ Complete | GPS extraction, Map view with clusters |
 | **Face Recognition** | ✅ Complete | Detection, DBSCAN clustering, People gallery |
-| **Object Detection** | ✅ Complete | CLIP AI, auto-tagging (animals, documents, places) |
+| **Object Detection** | ✅ Complete | CLIP AI, auto-tagging (animals, documents, nature) |
+| **Visual Hashtags** | ✅ Complete | Batch fetching, N+1 query fixed, Pagination |
+| **Maintainability** | ✅ Complete | Periodic Supabase keep-alive cron job |
 
 ---
 
@@ -414,4 +419,4 @@ All documentation is in `/docs` with comprehensive details:
 
 **Built with attention to detail and production-ready practices! 🚀**
 
-Last Updated: January 29, 2026
+Last Updated: January 30, 2026

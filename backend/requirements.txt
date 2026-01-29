@@ -20,7 +20,7 @@ psycopg2-binary==2.9.9
 # Note: You generally only need pyjwt OR python-jose.
 # python-jose is essentially abandoned. If possible, migrate to pyjwt only.
 pyjwt==2.8.0
-bcrypt==4.1.2
+bcrypt==4.0.1
 python-jose[cryptography]==3.3.0
 passlib==1.7.4
 google-auth==2.27.0
@@ -33,7 +33,8 @@ aioboto3==13.0.0
 # Note: Requires libvips-dev installed in Docker
 pyvips==2.2.1
 imagehash==4.3.1
-pillow==11.0.0
+timm
+pillow-avif-plugin
 reverse_geocoder==1.5.1
 piexif==1.1.3
 

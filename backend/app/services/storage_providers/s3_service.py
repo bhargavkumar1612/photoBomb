@@ -41,7 +41,7 @@ class S3Service:
         """
         Generate S3 Presigned POST URL.
         """
-        key = f"uploads/{user_id}/{upload_id}/original/{filename}"
+        key = f"{settings.STORAGE_PATH_PREFIX}/{user_id}/{upload_id}/original/{filename}"
         
         # Generate presigned POST parameters
         # Expires in 1 hour
@@ -70,7 +70,7 @@ class S3Service:
         # Let's conform to the return dict, but maybe shove fields into 'authorization_token' as JSON string?
         # A bit hacky. ideally refactor API.
         # But wait, looking at `upload.py`:
-        # `b2_key = f"uploads/{user_id}/{upload_id}/original/{filename}"`
+        # `b2_key = f"{settings.STORAGE_PATH_PREFIX}/{user_id}/{upload_id}/original/{filename}"`
         # It returns `presigned_url` and `authorization_token`.
         
         return {
@@ -184,3 +184,11 @@ class S3Service:
         except Exception as e:
             print(f"S3 List Error: {e}")
             return []
+
+    def file_exists(self, key: str) -> bool:
+        """Check if file exists in storage."""
+        try:
+            self.s3_client.head_object(Bucket=self.bucket_name, Key=key)
+            return True
+        except Exception:
+            return False

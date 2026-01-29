@@ -32,6 +32,17 @@ export default function PhotoItem({
                 />
             )}
 
+            {!selectionMode && photo.tags && photo.tags.length > 0 && (
+                <div className="visual-hashtags">
+                    {photo.tags.slice(0, 3).map(tag => (
+                        <div key={tag} className="visual-hashtag">#{tag}</div>
+                    ))}
+                    {photo.tags.length > 3 && (
+                        <div className="visual-hashtag">+{photo.tags.length - 3}</div>
+                    )}
+                </div>
+            )}
+
             <div className="photo-mediabox" style={{ minHeight: imageLoaded ? 'auto' : '200px', position: 'relative' }}>
                 {!imageLoaded && !hasError && (
                     <div className="photo-loader" style={{ position: 'absolute', inset: 0, zIndex: 1 }}>

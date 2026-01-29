@@ -10,7 +10,7 @@ import {
     Settings,
     Camera,
     PawPrint,
-    FileText,
+    Hash,
     Mountain
 } from 'lucide-react';
 import './Sidebar.css';
@@ -24,7 +24,7 @@ export default function Sidebar({ isOpen, onClose }) {
         { path: '/places', icon: <MapPin size={20} />, label: 'Places' },
         { path: '/people', icon: <Users size={20} />, label: 'People' },
         { path: '/animals', icon: <PawPrint size={20} />, label: 'Animals' },
-        { path: '/documents', icon: <FileText size={20} />, label: 'Documents' },
+        { path: '/hashtags', icon: <Hash size={20} />, label: 'Hashtags' },
         { path: '/nature', icon: <Mountain size={20} />, label: 'Nature' },
         { path: '/trash', icon: <Trash2 size={20} />, label: 'Trash' },
     ];

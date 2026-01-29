@@ -71,12 +71,14 @@ export default function Timeline({ favoritesOnly = false }) {
 
     const handleBulkDelete = async () => {
         if (!window.confirm(`Delete ${selectedPhotos.size} photos? This cannot be undone.`)) return
-        for (const photoId of selectedPhotos) {
-            try { await api.delete(`/photos/${photoId}`) } catch (e) { console.error(e) }
+        try {
+            await api.post('/photos/batch/delete', { photo_ids: Array.from(selectedPhotos) })
+            queryClient.invalidateQueries({ queryKey: ['photos'] })
+            setSelectedPhotos(new Set())
+            setSelectionMode(false)
+        } catch (error) {
+            alert(`Failed to delete photos: ${error.message}`)
         }
-        queryClient.invalidateQueries({ queryKey: ['photos'] })
-        setSelectedPhotos(new Set())
-        setSelectionMode(false)
     }
 
     const handleDownload = async (photo) => {
@@ -215,6 +217,24 @@ export default function Timeline({ favoritesOnly = false }) {
                             <CheckSquare size={18} />
                         </button>
 
+                        {selectionMode && (
+                            <button
+                                className="btn-icon-round"
+                                onClick={() => {
+                                    const allIds = filteredPhotos.map(p => p.photo_id)
+                                    if (selectedPhotos.size === allIds.length) {
+                                        setSelectedPhotos(new Set())
+                                    } else {
+                                        setSelectedPhotos(new Set(allIds))
+                                    }
+                                }}
+                                title="Select All"
+                                style={{ marginLeft: '8px' }}
+                            >
+                                <span style={{ fontSize: '12px', fontWeight: 'bold' }}>ALL</span>
+                            </button>
+                        )}
+
                         <div className="segmented-control small">
                             <button className={gridSize === 'compact' ? 'active' : ''} onClick={() => setGridSize('compact')} title="Compact">▦</button>
                             <button className={gridSize === 'comfortable' ? 'active' : ''} onClick={() => setGridSize('comfortable')} title="Comfortable">▣</button>
@@ -241,34 +261,73 @@ export default function Timeline({ favoritesOnly = false }) {
                             <h3>No photos found</h3>
                         </div>
                     ) : (
-                        groupedPhotos.map((group) => (
-                            <div key={group.label} className="date-group">
-                                <h3 className="group-header">{group.label}</h3>
-                                <Masonry
-                                    breakpointCols={breakpointColumns}
-                                    className="my-masonry-grid"
-                                    columnClassName="my-masonry-grid_column"
-                                >
-                                    {group.photos.map(photo => (
-                                        <PhotoItem
-                                            key={photo.photo_id}
-                                            photo={photo}
-                                            selectionMode={selectionMode}
-                                            isSelected={selectedPhotos.has(photo.photo_id)}
-                                            onToggleSelection={toggleSelection}
-                                            onLightbox={setLightboxPhoto}
-                                            onFavorite={(id) => favoriteMutation.mutate(id)}
-                                            isDeleting={deletingPhoto === photo.photo_id}
-                                            onDelete={handleDelete}
-                                            onDownload={handleDownload}
-                                            onInfo={handleInfo}
-                                            onShare={handleShare}
-                                            onAddToAlbum={handleAddToAlbum}
-                                        />
-                                    ))}
-                                </Masonry>
-                            </div>
-                        ))
+                        groupedPhotos.map((group) => {
+                            const groupPhotoIds = group.photos.map(p => p.photo_id)
+                            const isGroupSelected = groupPhotoIds.every(id => selectedPhotos.has(id))
+                            const isGroupPartiallySelected = !isGroupSelected && groupPhotoIds.some(id => selectedPhotos.has(id))
+
+                            return (
+                                <div key={group.label} className="date-group">
+                                    <h3 className="group-header">
+                                        {selectionMode && (
+                                            <div
+                                                className={`group-checkbox ${isGroupSelected ? 'selected' : ''} ${isGroupPartiallySelected ? 'partial' : ''}`}
+                                                onClick={() => {
+                                                    const newSelection = new Set(selectedPhotos)
+                                                    if (isGroupSelected) {
+                                                        groupPhotoIds.forEach(id => newSelection.delete(id))
+                                                    } else {
+                                                        groupPhotoIds.forEach(id => newSelection.add(id))
+                                                    }
+                                                    setSelectedPhotos(newSelection)
+                                                }}
+                                                style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    width: '20px',
+                                                    height: '20px',
+                                                    border: '2px solid #d1d5db',
+                                                    borderRadius: '4px',
+                                                    marginRight: '12px',
+                                                    cursor: 'pointer',
+                                                    backgroundColor: isGroupSelected || isGroupPartiallySelected ? '#3b82f6' : 'white',
+                                                    borderColor: isGroupSelected || isGroupPartiallySelected ? '#3b82f6' : '#d1d5db',
+                                                    verticalAlign: 'middle'
+                                                }}
+                                            >
+                                                {isGroupSelected && <CheckSquare size={14} color="white" />}
+                                                {isGroupPartiallySelected && <div style={{ width: '10px', height: '2px', background: 'white' }} />}
+                                            </div>
+                                        )}
+                                        {group.label}
+                                    </h3>
+                                    <Masonry
+                                        breakpointCols={breakpointColumns}
+                                        className="my-masonry-grid"
+                                        columnClassName="my-masonry-grid_column"
+                                    >
+                                        {group.photos.map(photo => (
+                                            <PhotoItem
+                                                key={photo.photo_id}
+                                                photo={photo}
+                                                selectionMode={selectionMode}
+                                                isSelected={selectedPhotos.has(photo.photo_id)}
+                                                onToggleSelection={toggleSelection}
+                                                onLightbox={setLightboxPhoto}
+                                                onFavorite={(id) => favoriteMutation.mutate(id)}
+                                                isDeleting={deletingPhoto === photo.photo_id}
+                                                onDelete={handleDelete}
+                                                onDownload={handleDownload}
+                                                onInfo={handleInfo}
+                                                onShare={handleShare}
+                                                onAddToAlbum={handleAddToAlbum}
+                                            />
+                                        ))}
+                                    </Masonry>
+                                </div>
+                            )
+                        })
                     )}
                 </div>
 

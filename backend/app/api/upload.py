@@ -278,7 +278,7 @@ async def direct_upload(
         await db.refresh(photo)
         
         # Now upload to B2 using the photo_id (so download can find it)
-        b2_key = f"uploads/{current_user.user_id}/{photo.photo_id}/original/{file.filename}"
+        b2_key = f"{settings.STORAGE_PATH_PREFIX}/{current_user.user_id}/{photo.photo_id}/original/{file.filename}"
         
         try:
             storage = get_storage_service()
@@ -354,7 +354,7 @@ async def cleanup_orphaned_photos(
     orphaned_photos = []
     
     for photo in photos:
-        b2_key = f"uploads/{current_user.user_id}/{photo.photo_id}/original/{photo.filename}"
+        b2_key = f"{settings.STORAGE_PATH_PREFIX}/{current_user.user_id}/{photo.photo_id}/original/{photo.filename}"
         
         try:
             # Try to download first few bytes to verify file exists

@@ -29,6 +29,19 @@ config.set_main_option('sqlalchemy.url', db_url)
 target_metadata = Base.metadata
 
 
+def include_object(object, name, type_, reflected, compare_to):
+    if type_ == "table":
+        if hasattr(object, "schema") and object.schema != settings.DB_SCHEMA:
+            return False
+    elif type_ == "index":
+        if hasattr(object, "table") and hasattr(object.table, "schema") and object.table.schema != settings.DB_SCHEMA:
+            return False
+    elif type_ == "foreign_key_constraint":
+        if hasattr(object, "table") and hasattr(object.table, "schema") and object.table.schema != settings.DB_SCHEMA:
+            return False
+    return True
+
+
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode."""
     url = config.get_main_option("sqlalchemy.url")
@@ -37,6 +50,9 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        version_table_schema=settings.DB_SCHEMA,
+        include_schemas=False,
+        include_object=include_object
     )
 
     with context.begin_transaction():
@@ -52,9 +68,21 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
+        # Create schema if not exists BEFORE configuring context
+        # This allows Alembic to create the version table inside that schema
+        from sqlalchemy import text
+        print(f"DEBUG: Ensuring schema '{settings.DB_SCHEMA}' exists...")
+        connection.execution_options(isolation_level="AUTOCOMMIT").execute(
+            text(f'CREATE SCHEMA IF NOT EXISTS "{settings.DB_SCHEMA}"')
+        )
+        # connection.commit() # Not needed with AUTOCOMMIT
+
         context.configure(
             connection=connection,
-            target_metadata=target_metadata
+            target_metadata=target_metadata,
+            version_table_schema=settings.DB_SCHEMA,
+            include_schemas=True,
+            include_object=include_object
         )
 
         with context.begin_transaction():

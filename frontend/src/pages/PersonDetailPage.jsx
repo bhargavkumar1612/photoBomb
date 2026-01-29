@@ -2,15 +2,17 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../services/api";
+import Lightbox from "../components/Lightbox";
 
 const PersonDetailPage = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const [person, setPerson] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [photos, setPhotos] = useState([]); // This needs an endpoint to fetch photos by person
+    const [photos, setPhotos] = useState([]);
     const [isEditing, setIsEditing] = useState(false);
     const [newName, setNewName] = useState("");
+    const [lightboxPhoto, setLightboxPhoto] = useState(null);
 
     useEffect(() => {
         fetchPersonDetails();
@@ -22,11 +24,8 @@ const PersonDetailPage = () => {
             setPerson(response.data);
             setNewName(response.data.name || "");
 
-            // TODO: Fetch photos for this person
-            // For now, we don't have an endpoint for photos by person explicitly, 
-            // but we can query specific photos if we implemented search/filter.
-            // Let's assume we add query param to /photos?person_id=...
-            // Or a new endpoint /people/:id/photos
+            const photosResponse = await api.get(`/people/${id}/photos`);
+            setPhotos(photosResponse.data);
 
         } catch (error) {
             console.error("Failed to fetch person", error);
@@ -107,7 +106,7 @@ const PersonDetailPage = () => {
                         </div>
                     ) : (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <h1 style={{ fontSize: '2rem', margin: 0 }}>{person.name || "Unknown"}</h1>
+                            <h1 style={{ fontSize: '2rem', margin: 0 }}>{formatName(person.name)}</h1>
                             <button
                                 onClick={() => setIsEditing(true)}
                                 style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#6b7280' }}
@@ -124,16 +123,51 @@ const PersonDetailPage = () => {
             </div>
 
             <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '20px' }}>
-                <p style={{ fontStyle: 'italic', color: '#6b7280' }}>
-                    Note: Photo list implementation requires /people/:id/photos endpoint.
-                </p>
-                {/* 
-                  Grid of photos matching this person would go here.
-                  Need backend support first.
-                */}
+                {photos.length === 0 ? (
+                    <p style={{ fontStyle: 'italic', color: '#6b7280' }}>
+                        No photos found for this person.
+                    </p>
+                ) : (
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+                        gap: '15px'
+                    }}>
+                        {photos.map(photo => (
+                            <div key={photo.photo_id} style={{ aspectRatio: '1', overflow: 'hidden', borderRadius: '8px', cursor: 'pointer' }} onClick={() => setLightboxPhoto(photo)}>
+                                <img
+                                    src={photo.thumb_urls.thumb_256}
+                                    alt={photo.caption || "Photo"}
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                    loading="lazy"
+                                />
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
+
+            {lightboxPhoto && (
+                <Lightbox
+                    photo={lightboxPhoto}
+                    photos={photos}
+                    onClose={() => setLightboxPhoto(null)}
+                    onNavigate={setLightboxPhoto}
+                />
+            )}
         </div>
     );
+};
+
+// Helper to clean up display name
+const formatName = (name) => {
+    if (!name) return "Unnamed Person";
+    // Check if it matches the default pattern "Person [8-char-hex]"
+    const defaultPattern = /^Person [0-9a-f]{8}$/i;
+    if (defaultPattern.test(name)) {
+        return "Unnamed Person";
+    }
+    return name;
 };
 
 export default PersonDetailPage;

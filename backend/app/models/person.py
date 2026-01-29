@@ -6,6 +6,7 @@ from pgvector.sqlalchemy import Vector
 import uuid
 
 from app.core.database import Base
+from app.core.config import settings
 
 class Person(Base):
     """
@@ -14,12 +15,12 @@ class Person(Base):
     __tablename__ = "people"
     
     person_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("photobomb.users.user_id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey(f"{settings.DB_SCHEMA}.users.user_id", ondelete="CASCADE"), nullable=False)
     
     name = Column(String(255), nullable=True)  # User assigned name, e.g., "Alice"
     
     # Pointer to a specific Face to use as the cover/thumbnail for this person
-    cover_face_id = Column(UUID(as_uuid=True), ForeignKey("photobomb.faces.face_id", ondelete="SET NULL", use_alter=True), nullable=True)
+    cover_face_id = Column(UUID(as_uuid=True), ForeignKey(f"{settings.DB_SCHEMA}.faces.face_id", ondelete="SET NULL", use_alter=True), nullable=True)
     
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -30,7 +31,7 @@ class Person(Base):
     cover_face = relationship("Face", foreign_keys=[cover_face_id], post_update=True)
     
     __table_args__ = (
-        {'schema': 'photobomb'}
+        {'schema': settings.DB_SCHEMA}
     )
     
     def __repr__(self):
@@ -44,10 +45,10 @@ class Face(Base):
     __tablename__ = "faces"
     
     face_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    photo_id = Column(UUID(as_uuid=True), ForeignKey("photobomb.photos.photo_id", ondelete="CASCADE"), nullable=False)
+    photo_id = Column(UUID(as_uuid=True), ForeignKey(f"{settings.DB_SCHEMA}.photos.photo_id", ondelete="CASCADE"), nullable=False)
     
     # Which person this face belongs to (nullable if not yet clustered/assigned)
-    person_id = Column(UUID(as_uuid=True), ForeignKey("photobomb.people.person_id", ondelete="SET NULL"), nullable=True)
+    person_id = Column(UUID(as_uuid=True), ForeignKey(f"{settings.DB_SCHEMA}.people.person_id", ondelete="SET NULL"), nullable=True)
     
     # Face encoding vector (128 dimensions for dlib/face_recognition)
     encoding = Column(Vector(128))
@@ -67,7 +68,7 @@ class Face(Base):
     __table_args__ = (
         Index('idx_faces_person', 'person_id'),
         Index('idx_faces_photo', 'photo_id'),
-        {'schema': 'photobomb'}
+        {'schema': settings.DB_SCHEMA}
     )
     
     def __repr__(self):

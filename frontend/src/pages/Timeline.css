@@ -254,6 +254,38 @@
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
+/* Visual Hashtags on image */
+.visual-hashtags {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 15;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    max-width: calc(100% - 20px);
+    pointer-events: none;
+}
+
+.visual-hashtag {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(4px);
+    color: #4f46e5;
+    padding: 2px 8px;
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    white-space: nowrap;
+}
+
+.photo-card:hover .visual-hashtag {
+    background: #4f46e5;
+    color: white;
+}
+
 /* Photo Overlay */
 .photo-overlay {
     position: absolute;

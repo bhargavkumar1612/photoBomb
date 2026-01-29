@@ -73,3 +73,7 @@ class StorageInterface(Protocol):
     def list_files(self, prefix: str, max_files: int = 1000) -> List[Dict[str, Any]]:
         """List files with prefix."""
         ...
+
+    def file_exists(self, key: str) -> bool:
+        """Check if file exists in storage."""
+        ...

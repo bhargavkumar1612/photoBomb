@@ -190,7 +190,7 @@ async def view_shared_album(
         uploader_name = photo.user.full_name if photo.user else "Unknown"
         uploader_avatar = None # photo.user.avatar_url if we had one
         
-        key_base = f"uploads/{uploader_id}/{photo.photo_id}"
+        key_base = f"{settings.STORAGE_PATH_PREFIX}/{uploader_id}/{photo.photo_id}"
 
         # Generate signed URLs manually using the batch token
         thumb_urls = {

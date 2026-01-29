@@ -21,10 +21,12 @@ export function AuthProvider({ children }) {
                     setUser(response.data)
                     setLoading(false)
                 })
-                .catch(() => {
-                    // Token invalid, clear it
-                    localStorage.removeItem('access_token')
-                    localStorage.removeItem('refresh_token')
+                .catch((error) => {
+                    // Only clear token if unauthorized (401), keep it for network errors (server down)
+                    if (error.response && error.response.status === 401) {
+                        localStorage.removeItem('access_token')
+                        localStorage.removeItem('refresh_token')
+                    }
                     setLoading(false)
                 })
         } else {

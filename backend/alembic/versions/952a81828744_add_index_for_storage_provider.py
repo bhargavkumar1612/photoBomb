@@ -6,6 +6,7 @@ Create Date: 2026-01-24 21:21:17.326234
 
 """
 from alembic import op
+from app.core.config import settings
 import sqlalchemy as sa
 
 
@@ -17,8 +18,8 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.create_index('idx_photos_user_provider_taken', 'photos', ['user_id', 'storage_provider', 'taken_at'], unique=False, schema='photobomb', postgresql_where='deleted_at IS NULL')
+    op.create_index('idx_photos_user_provider_taken', 'photos', ['user_id', 'storage_provider', 'taken_at'], unique=False, schema=settings.DB_SCHEMA, postgresql_where='deleted_at IS NULL')
 
 
 def downgrade() -> None:
-    op.drop_index('idx_photos_user_provider_taken', table_name='photos', schema='photobomb', postgresql_where='deleted_at IS NULL')
+    op.drop_index('idx_photos_user_provider_taken', table_name='photos', schema=settings.DB_SCHEMA, postgresql_where='deleted_at IS NULL')

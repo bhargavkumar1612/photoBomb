@@ -98,7 +98,7 @@ const PeoplePage = () => {
                                     )}
                                 </div>
                                 <div style={{ fontWeight: '500', textAlign: 'center' }}>
-                                    {person.name || "Unknown"}
+                                    {formatName(person.name)}
                                 </div>
                                 <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>
                                     {person.face_count} photos
@@ -110,6 +110,16 @@ const PeoplePage = () => {
             )}
         </div>
     );
+};
+
+// Helper to clean up display name
+const formatName = (name) => {
+    if (!name) return "Unnamed Person";
+    const defaultPattern = /^Person [0-9a-f]{8}$/i;
+    if (defaultPattern.test(name)) {
+        return "Unnamed Person";
+    }
+    return name;
 };
 
 export default PeoplePage;

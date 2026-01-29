@@ -102,7 +102,7 @@ async def create_album(
     cover_url = None
     if new_album.cover_photo_id:
         storage = get_storage_service()
-        key = f"uploads/{current_user.user_id}/{new_album.cover_photo_id}/thumbnails/thumb_512.jpg"
+        key = f"{settings.STORAGE_PATH_PREFIX}/{current_user.user_id}/{new_album.cover_photo_id}/thumbnails/thumb_512.jpg"
         cover_url = storage.generate_presigned_url(key)
 
     return AlbumResponse(
@@ -234,7 +234,7 @@ async def list_albums(
 
 
     def sign_thumb_with_owner(photo_id, owner_id, size=512):
-         key = f"uploads/{owner_id}/{photo_id}/thumbnails/thumb_{size}.jpg"
+         key = f"{settings.STORAGE_PATH_PREFIX}/{owner_id}/{photo_id}/thumbnails/thumb_{size}.jpg"
          return storage.generate_presigned_url(key, expires_in=86400)
 
     # 4. Assemble response
@@ -351,7 +351,7 @@ async def get_album(
         p_owner_id = p.user_id
         p_owner_name = p.user.full_name if p.user else "Unknown"
         
-        key_base = f"uploads/{p_owner_id}/{p.photo_id}"
+        key_base = f"{settings.STORAGE_PATH_PREFIX}/{p_owner_id}/{p.photo_id}"
         thumb_urls = {
             "thumb_256": sign_b2_url(f"{key_base}/thumbnails/thumb_256.jpg"),
             "thumb_512": sign_b2_url(f"{key_base}/thumbnails/thumb_512.jpg"),

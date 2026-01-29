@@ -6,6 +6,7 @@ Create Date: 2024-12-10 22:50:00
 
 """
 from alembic import op
+from app.core.config import settings
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
@@ -18,7 +19,7 @@ depends_on = None
 
 def upgrade() -> None:
     # Create photobomb schema
-    op.execute('CREATE SCHEMA IF NOT EXISTS photobomb')
+    op.execute(f'CREATE SCHEMA IF NOT EXISTS "{settings.DB_SCHEMA}"')
     
     # Install extensions (in public schema for shared use)
     op.execute('CREATE EXTENSION IF NOT EXISTS vector')
@@ -42,14 +43,14 @@ def upgrade() -> None:
         sa.Column('updated_at', sa.TIMESTAMP(timezone=True), server_default=sa.text('now()')),
         sa.Column('deleted_at', sa.TIMESTAMP(timezone=True), nullable=True),
         sa.CheckConstraint("email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}$'", name='email_format'),
-        schema='photobomb'
+        schema=settings.DB_SCHEMA
     )
     
     # Photos table (in photobomb schema)
     op.create_table(
         'photos',
         sa.Column('photo_id', postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column('user_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('photobomb.users.user_id', ondelete='CASCADE'), nullable=False),
+        sa.Column('user_id', postgresql.UUID(as_uuid=True), sa.ForeignKey(f'{settings.DB_SCHEMA}.users.user_id', ondelete='CASCADE'), nullable=False),
         sa.Column('filename', sa.String(500), nullable=False),
         sa.Column('mime_type', sa.String(100), nullable=False),
         sa.Column('size_bytes', sa.BigInteger(), nullable=False),
@@ -75,25 +76,25 @@ def upgrade() -> None:
         sa.Column('updated_at', sa.TIMESTAMP(timezone=True), server_default=sa.text('now()')),
         sa.Column('deleted_at', sa.TIMESTAMP(timezone=True), nullable=True),
         sa.CheckConstraint("mime_type IN ('image/jpeg', 'image/png', 'image/heic', 'image/webp', 'image/avif')", name='valid_mime_type'),
-        schema='photobomb'
+        schema=settings.DB_SCHEMA
     )
     
     # Indexes for photos
     op.create_index('idx_photos_user_taken', 'photos', ['user_id', 'taken_at'], 
                     postgresql_where=sa.text('deleted_at IS NULL'),
-                    schema='photobomb')
+                    schema=settings.DB_SCHEMA)
     op.create_index('idx_photos_user_uploaded', 'photos', ['user_id', 'uploaded_at'], 
                     postgresql_where=sa.text('deleted_at IS NULL'),
-                    schema='photobomb')
+                    schema=settings.DB_SCHEMA)
     op.create_index('idx_photos_favorite', 'photos', ['user_id', 'uploaded_at'], 
                     postgresql_where=sa.text('favorite = true AND deleted_at IS NULL'),
-                    schema='photobomb')
+                    schema=settings.DB_SCHEMA)
     
     # Photo files table (in photobomb schema)
     op.create_table(
         'photo_files',
         sa.Column('file_id', postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column('photo_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('photobomb.photos.photo_id', ondelete='CASCADE'), nullable=False),
+        sa.Column('photo_id', postgresql.UUID(as_uuid=True), sa.ForeignKey(f'{settings.DB_SCHEMA}.photos.photo_id', ondelete='CASCADE'), nullable=False),
         sa.Column('variant', sa.String(50), nullable=False),
         sa.Column('format', sa.String(10), nullable=False),
         sa.Column('storage_backend', sa.String(20), default='b2'),
@@ -103,21 +104,21 @@ def upgrade() -> None:
         sa.Column('width', sa.Integer(), nullable=True),
         sa.Column('height', sa.Integer(), nullable=True),
         sa.Column('created_at', sa.TIMESTAMP(timezone=True), server_default=sa.text('now()')),
-        schema='photobomb'
+        schema=settings.DB_SCHEMA
     )
     
-    op.create_index('idx_photo_files_photo', 'photo_files', ['photo_id'], schema='photobomb')
-    op.create_index('idx_photo_files_unique', 'photo_files', ['photo_id', 'variant', 'format'], unique=True, schema='photobomb')
+    op.create_index('idx_photo_files_photo', 'photo_files', ['photo_id'], schema=settings.DB_SCHEMA)
+    op.create_index('idx_photo_files_unique', 'photo_files', ['photo_id', 'variant', 'format'], unique=True, schema=settings.DB_SCHEMA)
 
 
 def downgrade() -> None:
     # Drop tables (will cascade due to schema drop, but being explicit)
-    op.drop_table('photo_files', schema='photobomb')
-    op.drop_table('photos', schema='photobomb')
-    op.drop_table('users', schema='photobomb')
+    op.drop_table('photo_files', schema=settings.DB_SCHEMA)
+    op.drop_table('photos', schema=settings.DB_SCHEMA)
+    op.drop_table('users', schema=settings.DB_SCHEMA)
     
     # Drop schema
-    op.execute('DROP SCHEMA IF EXISTS photobomb CASCADE')
+    op.execute(f'DROP SCHEMA IF EXISTS "{settings.DB_SCHEMA}" CASCADE')
     
     # Drop extensions
     op.execute('DROP EXTENSION IF EXISTS vector')

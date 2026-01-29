@@ -14,7 +14,7 @@ PhotoBomb is a comprehensive production plan for building a full-featured photo 
 - **Albums** with collaborative features (contributors, sharing, viewer tracking)
 - **Trash & Restore** functionality with soft delete
 - **Face Recognition** with automatic clustering (DBSCAN, pgvector embeddings)
-- **Object & Scene Detection** via CLIP AI (animals, documents, places)
+- **Visual Hashtags** via CLIP AI (automatic tagging for animals, documents, etc.)
 - **Place Recognition** with GPS extraction and reverse geocoding
 - **PWA installable** on Android/iOS (offline uploads, service worker)
 - **Privacy-first design** (GDPR/CCPA compliant, user data control)

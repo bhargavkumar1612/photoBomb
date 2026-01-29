@@ -14,7 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Hybrid Storage Support**: `storage_provider` column in `Photo` model enables simultaneous use of multiple storage backends with automatic provider selection per photo.
 - **Place Recognition**: GPS data extraction from EXIF, reverse geocoding to location names, and interactive Map view with clustered markers (Leaflet).
 - **Face Recognition**: Automatic face detection using `face_recognition` library, DBSCAN clustering to group faces into people, People gallery page with rename functionality, and pgvector storage for 128-dimensional face embeddings.
-- **Object & Scene Detection**: CLIP-based zero-shot classification for automatic photo tagging across 25+ categories including animals (dog, cat, bird), documents (receipt, invoice, ID card), and places (beach, mountain, city). Frontend category pages for Animals, Documents, and Nature with filtered photo views.
+- **Object & Scene Detection (Visual Hashtags)**: Upgraded CLIP-based zero-shot classification system. Rebranded "Documents" category to "Visual Hashtags" for a more intuitive user experience. Unified animal and document detections under the "Hashtags" feature.
+- **Supabase Keep-Alive**: Implemented a periodic Celery heartbeat task (`keep_db_alive`) that runs every 2 hours to prevent the Supabase database from going dormant.
+- **Database Indexing**: Added critical performance indexes on `tags.category`, `photo_tags.tag_id`, and `photo_tags.tag_confidence` to optimize hashtag-based search and filtering.
+- **Hashtag API Optimizations**: Resolved N+1 query bottlenecks in the hashtags listing API using batch fetching and introduced limit/offset pagination to the hashtag photos endpoint for significantly faster page loads.
 - **Google Login**: Support for users to sign in/up with their Google accounts via OAuth2.
 - **Trash & Restore**: Soft delete functionality for photos with a Trash view and Restore/Permanent Delete options.
 - **Secure Image Serving**: Implemented Ahead-Of-Time (AOT) Presigned URLs to serve all images securely without JWTs in URLs.
@@ -29,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Deployment Guide**: Updated GITHUB_DEPLOYMENT.md to reflect split architecture (Cloudflare + VPS).
 - **Storage Migration**: Replaced all Backblaze B2 references with Cloudflare R2 across documentation (README, Architecture, Cost Model, Checklists).
 - **Documentation Audit**: Synchronized all docs with codebase reality - marked Albums as Complete, Face Recognition & Sharing as In Progress.
+- **Visual Hashtags Rebranding**: Renamed "Documents" feature to "Hashtags" across backend APIs, frontend routes, and UI components. Updated sidebar and detail views to use the new nomenclature and icons.
+- **SQLAlchemy Optimization**: Resolved SQLAlchemy `SAWarning` related to overlapping relationships by adding the `overlaps` parameter to `Tag` and `Photo` models.
 
 ### Fixed
 - **Shared Link Access**: Added error handling for viewer tracking to prevent shared link failures when database writes fail.

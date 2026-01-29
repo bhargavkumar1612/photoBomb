@@ -34,6 +34,10 @@
   - `btree_gin` for composite indexes
 - **Connection pooling**: PgBouncer (transaction mode, pool size = cores × 2)
 - **Read replicas** for analytics and search (async replication lag < 1s)
+- **Performance Optimized Indexes**:
+  - `idx_tags_category`: Fast filtering for hashtags main page
+  - `idx_photo_tags_tag_id`: Instant photo retrieval for specific hashtags
+  - `idx_photo_tags_tag_confidence`: Ranking relevant photos within tags
 
 ### Storage Layer (Cloudflare R2)
 - **Primary: Cloudflare R2** (S3-compatible)
@@ -65,6 +69,7 @@
   - `high`: User-facing (thumbnail generation)
   - `low`: Background (face embeddings, ML)
   - `batch`: Bulk operations (reprocessing)
+  - `cron`: Periodic tasks (Supabase keep-alive query every 2 hours)
 
 ## Data Flows
 

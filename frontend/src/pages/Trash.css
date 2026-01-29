@@ -36,10 +36,33 @@
     font-size: 14px;
 }
 
+.trash-actions-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 40px;
+    margin-top: 12px;
+}
+
+.bulk-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    animation: fadeIn 0.2s ease-out;
+}
+
+.selection-count {
+    font-size: 14px;
+    font-weight: 500;
+    color: #4b5563;
+    margin-right: 8px;
+}
+
 .trash-card .photo-wrapper {
     position: relative;
     border-radius: 4px;
     overflow: hidden;
+    cursor: pointer;
 }
 
 .trash-card img {
@@ -49,6 +72,12 @@
     /* Grayscale to indicate deleted state */
     filter: grayscale(30%);
     transition: filter 0.2s;
+}
+
+.trash-card.selected img {
+    filter: grayscale(0%);
+    box-shadow: 0 0 0 3px #3b82f6;
+    /* Blue ring */
 }
 
 .trash-card:hover img {
@@ -71,6 +100,21 @@
 
 .trash-card:hover .trash-actions {
     opacity: 1;
+}
+
+.selection-overlay {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 5;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+    padding: 2px;
+}
+
+.selection-overlay.selected {
+    background: white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .btn-trash-action {
@@ -135,5 +179,17 @@
 @keyframes spin {
     to {
         transform: rotate(360deg);
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
     }
 }
