@@ -14,7 +14,18 @@ export default {
 
             // Clone response to add headers (responses are immutable)
             response = new Response(response.body, response);
-            response.headers.set('X-Worker-Version', '1.0.1-debug');
+
+            // Add security headers
+            response.headers.set('X-Worker-Version', '1.0.2-coop-fix');
+
+            // Critical: Allow OAuth popups to communicate with the parent window
+            // This fixes the "Cross-Origin-Opener-Policy policy would block the window.postMessage call" error
+            response.headers.set('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+
+            // Additional security headers for best practices
+            response.headers.set('X-Content-Type-Options', 'nosniff');
+            response.headers.set('X-Frame-Options', 'SAMEORIGIN');
+            response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
 
             // If the asset is not found (404), and it's likely a navigation request (SPA route)
 
@@ -33,7 +44,17 @@ export default {
 
                 // Fallback to index.html ONLY for navigation requests that aren't API calls or static assets
                 if (!isStaticAsset && !pathname.startsWith('/api/') && !pathname.startsWith('/assets/') && acceptsHtml) {
-                    return env.ASSETS.fetch(new URL('/index.html', request.url));
+                    const fallbackResponse = await env.ASSETS.fetch(new URL('/index.html', request.url));
+
+                    // CRITICAL: Add headers to the fallback response too!
+                    const responseWithHeaders = new Response(fallbackResponse.body, fallbackResponse);
+                    responseWithHeaders.headers.set('X-Worker-Version', '1.0.2-coop-fix');
+                    responseWithHeaders.headers.set('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+                    responseWithHeaders.headers.set('X-Content-Type-Options', 'nosniff');
+                    responseWithHeaders.headers.set('X-Frame-Options', 'SAMEORIGIN');
+                    responseWithHeaders.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+
+                    return responseWithHeaders;
                 }
             }
 
