@@ -1,6 +1,17 @@
 import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { CheckSquare } from 'lucide-react'
+import {
+    CheckSquare,
+    LayoutGrid,
+    Grid3X3,
+    Square,
+    MoreVertical,
+    CheckCircle2,
+    X,
+    Trash2,
+    FolderPlus,
+    Settings
+} from 'lucide-react'
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 import Masonry from 'react-masonry-css'
 import Lightbox from '../components/Lightbox'
@@ -27,6 +38,7 @@ export default function Timeline({ favoritesOnly = false }) {
     const [selectedPhotos, setSelectedPhotos] = useState(new Set())
     const [selectionMode, setSelectionMode] = useState(false)
     const [gridSize, setGridSize] = useState(localStorage.getItem('gridSize') || 'comfortable')
+    const [showViewSettings, setShowViewSettings] = useState(false)
     const [showFavoritesOnly, setShowFavoritesOnly] = useState(favoritesOnly)
     const [lightboxPhoto, setLightboxPhoto] = useState(null)
     const [showAlbumModal, setShowAlbumModal] = useState(false)
@@ -42,7 +54,52 @@ export default function Timeline({ favoritesOnly = false }) {
 
     const favoriteMutation = useMutation({
         mutationFn: (photoId) => api.patch(`/photos/${photoId}/favorite`),
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['photos'] })
+        onMutate: async (photoId) => {
+            // Cancel any outgoing refetches
+            await queryClient.cancelQueries({ queryKey: ['photos'] })
+
+            // Snapshot the previous value
+            const previousPhotos = queryClient.getQueryData(['photos'])
+
+            // Optimistically update to the new value
+            queryClient.setQueryData(['photos'], (old) => {
+                if (!old) return old
+
+                // Handle case where data is { photos: [...], ... }
+                if (old.photos && Array.isArray(old.photos)) {
+                    return {
+                        ...old,
+                        photos: old.photos.map(photo =>
+                            photo.photo_id === photoId
+                                ? { ...photo, favorite: !photo.favorite }
+                                : photo
+                        )
+                    }
+                }
+
+                // Fallback for array structure (if API changes back)
+                if (Array.isArray(old)) {
+                    return old.map(photo =>
+                        photo.photo_id === photoId
+                            ? { ...photo, favorite: !photo.favorite }
+                            : photo
+                    )
+                }
+
+                return old
+            })
+
+            // Return a context object with the snapshotted value
+            return { previousPhotos }
+        },
+        onError: (err, photoId, context) => {
+            if (context?.previousPhotos) {
+                queryClient.setQueryData(['photos'], context.previousPhotos)
+            }
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['photos'] })
+        }
     })
 
     const handleCleanup = async () => {
@@ -160,11 +217,11 @@ export default function Timeline({ favoritesOnly = false }) {
     return (
         <div className="timeline-wrapper">
             {/* Note: TopBar handles Search now, so SearchBar is just filtered list here if we want filtering */}
-            {/* Actually, user feedback implies filters panel is used. We can keep SearchBar just for filtering without input if needed, 
-                 OR we rely on TopBar. But SearchBar state is shared via Context now. 
-                 The Timeline needs the Layout to provide the TopBar. Timeline itself is just content. 
+            {/* Actually, user feedback implies filters panel is used. We can keep SearchBar just for filtering without input if needed,
+                 OR we rely on TopBar. But SearchBar state is shared via Context now.
+                 The Timeline needs the Layout to provide the TopBar. Timeline itself is just content.
                  If we put SearchBar here, it might duplicate or be the intended place for filters only.
-                 The user screenshot shows filters. 
+                 The user screenshot shows filters.
                  I will keep SearchBar hidden or styled minimally if it's cleaner, but for now removing duplicate UI is safer.
                  Wait, the SearchBar component HAS the filter UI. So we need it rendered somewhere.
                  TopBar renders SearchBar. So we don't need it here.
@@ -172,83 +229,154 @@ export default function Timeline({ favoritesOnly = false }) {
 
             {/* Main Layout for Timeline with Sidebar-like filtering */}
             <div className="timeline-layout-container">
-                <div className="timeline-sub-header">
-                    <div className="sub-header-left">
-                        <h1
-                            className={`header-tab ${!showFavoritesOnly ? 'active' : ''}`}
-                            onClick={() => setShowFavoritesOnly(false)}
-                        >
-                            Photos
-                        </h1>
-                        <h1
-                            className={`header-tab ${showFavoritesOnly ? 'active' : ''}`}
-                            onClick={() => setShowFavoritesOnly(true)}
-                        >
-                            Favorites
-                        </h1>
-                    </div>
-
-                    <div className="sub-header-center">
-                        <div className="segmented-control">
-                            <button
-                                className={viewMode === 'day' ? 'active' : ''}
-                                onClick={() => setViewMode('day')}
-                            >Day</button>
-                            <button
-                                className={viewMode === 'month' ? 'active' : ''}
-                                onClick={() => setViewMode('month')}
-                            >Month</button>
-                            <button
-                                className={viewMode === 'year' ? 'active' : ''}
-                                onClick={() => setViewMode('year')}
-                            >Year</button>
-                        </div>
-                    </div>
-
-                    <div className="sub-header-right">
-                        <button
-                            className={`btn-icon-round ${selectionMode ? 'active' : ''}`}
-                            onClick={() => {
-                                if (selectionMode) cancelSelection();
-                                else setSelectionMode(true);
-                            }}
-                            title={selectionMode ? 'Cancel Selection' : 'Select Photos'}
-                        >
-                            <CheckSquare size={18} />
-                        </button>
-
-                        {selectionMode && (
-                            <button
-                                className="btn-icon-round"
-                                onClick={() => {
-                                    const allIds = filteredPhotos.map(p => p.photo_id)
-                                    if (selectedPhotos.size === allIds.length) {
-                                        setSelectedPhotos(new Set())
-                                    } else {
-                                        setSelectedPhotos(new Set(allIds))
-                                    }
-                                }}
-                                title="Select All"
-                                style={{ marginLeft: '8px' }}
-                            >
-                                <span style={{ fontSize: '12px', fontWeight: 'bold' }}>ALL</span>
-                            </button>
-                        )}
-
-                        <div className="segmented-control small">
-                            <button className={gridSize === 'compact' ? 'active' : ''} onClick={() => setGridSize('compact')} title="Compact">▦</button>
-                            <button className={gridSize === 'comfortable' ? 'active' : ''} onClick={() => setGridSize('comfortable')} title="Comfortable">▣</button>
-                            <button className={gridSize === 'cozy' ? 'active' : ''} onClick={() => setGridSize('cozy')} title="Large">▢</button>
-                        </div>
-
-                        {selectionMode && selectedPhotos.size > 0 && (
-                            <div className="selection-actions">
-                                <span>{selectedPhotos.size} selected</span>
-                                <button className="btn-secondary" onClick={handleBulkAddToAlbum}>Add to Album</button>
-                                <button className="btn-secondary danger" onClick={handleBulkDelete}>Delete</button>
+                <div className={`timeline-sub-header ${selectionMode ? 'selection-mode' : ''}`}>
+                    {!selectionMode ? (
+                        <>
+                            <div className="sub-header-left">
+                                <h1
+                                    className={`header-tab ${!showFavoritesOnly ? 'active' : ''}`}
+                                    onClick={() => setShowFavoritesOnly(false)}
+                                >
+                                    Photos
+                                </h1>
+                                <h1
+                                    className={`header-tab ${showFavoritesOnly ? 'active' : ''}`}
+                                    onClick={() => setShowFavoritesOnly(true)}
+                                >
+                                    Favorites
+                                </h1>
                             </div>
-                        )}
-                    </div>
+
+                            <div className="sub-header-center">
+                                {/* View mode tabs removed, now in dropdown */}
+                            </div>
+
+                            <div className="sub-header-right">
+                                <button
+                                    className="btn-icon-round"
+                                    onClick={() => setSelectionMode(true)}
+                                    title="Select Photos"
+                                >
+                                    <CheckSquare size={18} />
+                                </button>
+
+                                <div className="view-settings-wrapper">
+                                    <button
+                                        className="btn-icon-round"
+                                        onClick={() => setShowViewSettings(!showViewSettings)}
+                                        title="View Settings"
+                                    >
+                                        <Settings size={18} />
+                                    </button>
+
+                                    {showViewSettings && (
+                                        <>
+                                            <div
+                                                className="view-settings-backdrop"
+                                                onClick={() => setShowViewSettings(false)}
+                                            />
+                                            <div className="view-settings-dropdown">
+                                                <div className="dropdown-section">
+                                                    <div className="dropdown-label">Group By</div>
+                                                    <div className="dropdown-options">
+                                                        <button
+                                                            className={viewMode === 'day' ? 'active' : ''}
+                                                            onClick={() => { setViewMode('day'); setShowViewSettings(false); }}
+                                                        >
+                                                            Day
+                                                        </button>
+                                                        <button
+                                                            className={viewMode === 'month' ? 'active' : ''}
+                                                            onClick={() => { setViewMode('month'); setShowViewSettings(false); }}
+                                                        >
+                                                            Month
+                                                        </button>
+                                                        <button
+                                                            className={viewMode === 'year' ? 'active' : ''}
+                                                            onClick={() => { setViewMode('year'); setShowViewSettings(false); }}
+                                                        >
+                                                            Year
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <div className="dropdown-divider" />
+
+                                                <div className="dropdown-section">
+                                                    <div className="dropdown-label">Grid Density</div>
+                                                    <div className="dropdown-options">
+                                                        <button
+                                                            className={gridSize === 'compact' ? 'active' : ''}
+                                                            onClick={() => { setGridSize('compact'); setShowViewSettings(false); }}
+                                                        >
+                                                            <Grid3X3 size={16} />
+                                                            <span>Compact</span>
+                                                        </button>
+                                                        <button
+                                                            className={gridSize === 'comfortable' ? 'active' : ''}
+                                                            onClick={() => { setGridSize('comfortable'); setShowViewSettings(false); }}
+                                                        >
+                                                            <LayoutGrid size={16} />
+                                                            <span>Comfortable</span>
+                                                        </button>
+                                                        <button
+                                                            className={gridSize === 'cozy' ? 'active' : ''}
+                                                            onClick={() => { setGridSize('cozy'); setShowViewSettings(false); }}
+                                                        >
+                                                            <Square size={16} />
+                                                            <span>Large</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <div className="sub-header-left">
+                                <button className="btn-icon-round cancel" onClick={cancelSelection}>
+                                    <X size={20} />
+                                </button>
+                                <div className="selection-count">
+                                    <span>{selectedPhotos.size} selected</span>
+                                </div>
+                            </div>
+
+                            <div className="sub-header-center">
+                                <button
+                                    className="btn-text-select-all"
+                                    onClick={() => {
+                                        const allIds = filteredPhotos.map(p => p.photo_id)
+                                        if (selectedPhotos.size === allIds.length) {
+                                            setSelectedPhotos(new Set())
+                                        } else {
+                                            setSelectedPhotos(new Set(allIds))
+                                        }
+                                    }}
+                                >
+                                    {selectedPhotos.size === filteredPhotos.length ? 'Deselect All' : 'Select All'}
+                                </button>
+                            </div>
+
+                            <div className="sub-header-right">
+                                {selectedPhotos.size > 0 && (
+                                    <div className="selection-actions">
+                                        <button className="btn-secondary" onClick={handleBulkAddToAlbum}>
+                                            <FolderPlus size={16} />
+                                            <span>Add to Album</span>
+                                        </button>
+                                        <button className="btn-secondary danger" onClick={handleBulkDelete}>
+                                            <Trash2 size={16} />
+                                            <span>Delete</span>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </>
+                    )}
                 </div>
 
                 <div className="timeline-content">
@@ -304,7 +432,7 @@ export default function Timeline({ favoritesOnly = false }) {
                                     </h3>
                                     <Masonry
                                         breakpointCols={breakpointColumns}
-                                        className="my-masonry-grid"
+                                        className={`my-masonry-grid photo-grid ${gridSize}`}
                                         columnClassName="my-masonry-grid_column"
                                     >
                                         {group.photos.map(photo => (

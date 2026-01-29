@@ -20,7 +20,6 @@ import AnimalsPage from './pages/AnimalsPage'
 import AnimalDetailPage from './pages/AnimalDetailPage'
 import HashtagsPage from './pages/HashtagsPage'
 import HashtagDetailPage from './pages/HashtagDetailPage'
-import { NaturePage } from './pages/CategoryPages'
 import PlaceholderPage from './pages/PlaceholderPage'
 import UploadProgressWidget from './components/UploadProgressWidget'
 import './App.css'
@@ -91,7 +90,6 @@ function App() {
                             <Route path="/animals/:id" element={<AnimalDetailPage />} />
                             <Route path="/hashtags" element={<HashtagsPage />} />
                             <Route path="/hashtags/tag/:tagId" element={<HashtagDetailPage />} />
-                            <Route path="/nature" element={<NaturePage />} />
                             <Route path="/favorites" element={<Timeline favoritesOnly={true} />} />
                             <Route path="/trash" element={<Trash />} />
                             <Route path="/settings" element={<Settings />} />

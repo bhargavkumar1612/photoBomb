@@ -21,18 +21,21 @@ const HashtagDetailPage = () => {
 
     const fetchTagPhotos = async () => {
         try {
-            // We need to get the tag name too, but let's assume we can get it from the first photo or another call
-            // For now, let's just fetch photos and find the tag in the list of all tags if needed
-            // Or just update the API to return tag info
-            const response = await api.get(`/hashtags/${tagId}/photos`);
-            setPhotos(response.data);
-
-            // Try to find the tag name by listing all tags and finding by ID
+            // First, get all hashtags to find the one with matching name
             const tagsRes = await api.get("/hashtags");
-            const currentTag = tagsRes.data.find(t => t.tag_id === tagId);
-            if (currentTag) {
-                setTagName(currentTag.name);
+            const currentTag = tagsRes.data.find(t => t.name === tagId);
+
+            if (!currentTag) {
+                console.error("Tag not found");
+                setLoading(false);
+                return;
             }
+
+            setTagName(currentTag.name);
+
+            // Now fetch photos using the tag's UUID
+            const response = await api.get(`/hashtags/${currentTag.tag_id}/photos`);
+            setPhotos(response.data);
         } catch (error) {
             console.error("Failed to fetch hashtag photos", error);
         } finally {

@@ -208,10 +208,4 @@ const CategoryPage = ({ category, title, description }) => {
 };
 
 // Export specific category pages
-export const NaturePage = () => (
-    <CategoryPage
-        category="nature"
-        title="Nature & Places"
-        description="Beaches, mountains, forests, cities, and scenic views"
-    />
-);
+// (NaturePage removed - merged into Hashtags)

@@ -44,12 +44,12 @@ def determine_category(label: str) -> str:
         return "people"
     elif label in ["animal", "dog", "cat", "bird", "wildlife", "pet", "horse"]:
         return "animals"
-    elif label in ["document", "receipt", "invoice", "text", "paper", "screenshot", "computer screen", "interface", "software"]:
+    elif label in [
+        "document", "receipt", "invoice", "text", "paper", "screenshot", "computer screen", "interface", "software",
+        "nature", "beach", "mountain", "forest", "sunset", "sky", "tree", "flower", "outdoor",
+        "city", "building", "architecture", "street", "house", "landmark", "room", "indoor"
+    ]:
         return "documents"
-    elif label in ["nature", "beach", "mountain", "forest", "sunset", "sky", "tree", "flower", "outdoor"]:
-        return "nature"
-    elif label in ["city", "building", "architecture", "street", "house", "landmark", "room", "indoor"]:
-        return "places"
     return "general"
 
 def classify_image(image_path: str, threshold: float = 0.4) -> List[Dict[str, Any]]:

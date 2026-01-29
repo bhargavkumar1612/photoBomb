@@ -1,6 +1,7 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import HorizontalLoader from './HorizontalLoader'
-import { Heart, Trash2, Download, Info, Share2, FolderPlus, Loader2 } from 'lucide-react'
+import { Heart, Trash2, Download, Info, Share2, FolderPlus, Loader2, CheckSquare } from 'lucide-react'
 
 export default function PhotoItem({
     photo,
@@ -24,24 +25,16 @@ export default function PhotoItem({
     return (
         <div className={`photo-card ${isSelected ? 'selected' : ''}`}>
             {selectionMode && (
-                <input
-                    type="checkbox"
-                    className="photo-checkbox"
-                    checked={isSelected}
-                    onChange={() => onToggleSelection(photo.photo_id)}
-                />
-            )}
-
-            {!selectionMode && photo.tags && photo.tags.length > 0 && (
-                <div className="visual-hashtags">
-                    {photo.tags.slice(0, 3).map(tag => (
-                        <div key={tag} className="visual-hashtag">#{tag}</div>
-                    ))}
-                    {photo.tags.length > 3 && (
-                        <div className="visual-hashtag">+{photo.tags.length - 3}</div>
-                    )}
+                <div
+                    className={`photo-selection-indicator ${isSelected ? 'selected' : ''}`}
+                    onClick={(e) => { e.stopPropagation(); onToggleSelection(photo.photo_id); }}
+                >
+                    <div className="selection-checkmark">
+                        <CheckSquare size={16} fill={isSelected ? "white" : "none"} />
+                    </div>
                 </div>
             )}
+
 
             <div className="photo-mediabox" style={{ minHeight: imageLoaded ? 'auto' : '200px', position: 'relative' }}>
                 {!imageLoaded && !hasError && (
@@ -143,6 +136,32 @@ export default function PhotoItem({
                         <button className="overlay-btn" onClick={(e) => { e.stopPropagation(); onAddToAlbum(photo) }} title="Add to album">
                             <FolderPlus size={18} />
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {!selectionMode && !isSelected && photo.tags && photo.tags.length > 0 && (
+                <div className="visual-hashtags-container">
+                    <div className="visual-hashtags">
+                        {photo.tags.slice(0, 2).map(tag => (
+                            <Link
+                                key={tag}
+                                to={`/hashtags/tag/${tag}`}
+                                className="visual-hashtag"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                #{tag}
+                            </Link>
+                        ))}
+                        {photo.tags.length > 2 && (
+                            <Link
+                                to={`/hashtags`}
+                                className="visual-hashtag"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                +{photo.tags.length - 2}
+                            </Link>
+                        )}
                     </div>
                 </div>
             )}

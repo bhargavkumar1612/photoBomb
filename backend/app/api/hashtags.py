@@ -39,7 +39,7 @@ async def list_hashtags(
         .join(PhotoTag, PhotoTag.tag_id == Tag.tag_id)
         .join(Photo, Photo.photo_id == PhotoTag.photo_id)
         .where(
-            Tag.category.in_(["documents", "animals"]),
+            Tag.category.in_(["documents", "animals", "places", "place", "nature"]),
             Photo.user_id == current_user.user_id,
             Photo.deleted_at == None
         )

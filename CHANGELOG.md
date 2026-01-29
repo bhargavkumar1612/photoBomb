@@ -24,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Share Modal Improvements**: Enhanced UI with tabbed interface separating "Public Links" and "Viewers", displaying aggregated viewer list across all share links.
 
 ### Changed
+- **Gallery UI Overhaul**: Complete redesign of the photo timeline with premium glassmorphism aesthetics, contextual selection headers, and refined spacing.
+- **View Settings**: Consolidated grid density (Compact/Comfortable/Large) and date grouping (Day/Month/Year) controls into a unified Jira-style dropdown menu.
+- **Hashtag Display**: Updated hashtag visibility logic to remain hidden by default and fade in smoothly on hover to reduce visual clutter.
+- **Optimistic UI**: Implemented instant feedback for "Favorite" actions using robust optimistic cache updates, eliminating perceived API latency.
 - **Viewer Display**: Refactored Share Modal to show aggregated viewers in dedicated "Viewers" tab instead of inline under each link.
 - **Contributor Management**: Moved contributor invitation and management from Share Modal to album detail page for better UX and clearer separation of concerns.
 - **Storage Architecture**: Migrated from single B2 provider to pluggable storage architecture supporting B2, S3, and R2 with per-photo provider tracking.
@@ -36,6 +40,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **SQLAlchemy Optimization**: Resolved SQLAlchemy `SAWarning` related to overlapping relationships by adding the `overlaps` parameter to `Tag` and `Photo` models.
 
 ### Fixed
+- **Selection Mode Crash**: Resolved `ReferenceError` for `CheckSquare` icon in PhotoItem component.
+- **Favorite API**: Fixed malformed API URL generation (`/ photos /` -> `/photos/`) preventing favorite actions.
+- **Delete Button**: Corrected positioning and styling of the delete button in the photo overlay.
 - **Shared Link Access**: Added error handling for viewer tracking to prevent shared link failures when database writes fail.
 - **Storage Provider Selection**: Fixed photo retrieval to use correct storage provider per photo for hybrid storage scenarios.
 

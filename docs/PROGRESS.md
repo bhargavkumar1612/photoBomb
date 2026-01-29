@@ -267,7 +267,7 @@ npm run dev
 | Photo Upload (Presign) | ✅ Complete | R2/S3 presigned URLs |
 | Duplicate Detection | ✅ Complete | SHA256 hash checking |
 | Storage Quota | ✅ Complete | Enforced on upload |
-| Timeline View | ✅ Complete | Photo grid with pagination |
+| Timeline View | ✅ Complete | Premium Glassmorphism UI, Optimistic Updates |
 | Thumbnails (Secure) | ✅ Complete | AOT Presigned URLs |
 | Trash / Restore | ✅ Complete | Soft delete + Restore UI |
 | Upload Progress | ✅ Complete | Real-time progress bars |
