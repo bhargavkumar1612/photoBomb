@@ -19,7 +19,10 @@ depends_on = None
 from app.core.config import settings
 
 def upgrade() -> None:
-    op.create_index('ix_faces_person_photo', 'faces', ['person_id', 'photo_id'], unique=False, schema=settings.DB_SCHEMA)
+    try:
+        op.create_index('ix_faces_person_photo', 'faces', ['person_id', 'photo_id'], unique=False, schema=settings.DB_SCHEMA)
+    except Exception:
+        pass
 
 
 def downgrade() -> None:

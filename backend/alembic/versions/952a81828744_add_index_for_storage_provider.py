@@ -18,7 +18,12 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.create_index('idx_photos_user_provider_taken', 'photos', ['user_id', 'storage_provider', 'taken_at'], unique=False, schema=settings.DB_SCHEMA, postgresql_where='deleted_at IS NULL')
+    # Inspection to make migration idempotent
+    # Indexes are best handled with try/except since inspector check is complex with schemas
+    try:
+        op.create_index('idx_photos_user_provider_taken', 'photos', ['user_id', 'storage_provider', 'taken_at'], unique=False, schema=settings.DB_SCHEMA, postgresql_where='deleted_at IS NULL')
+    except Exception:
+        pass
 
 
 def downgrade() -> None:

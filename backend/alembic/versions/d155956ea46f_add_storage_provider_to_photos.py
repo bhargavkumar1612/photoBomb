@@ -18,7 +18,13 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column('photos', sa.Column('storage_provider', sa.String(length=20), nullable=False, server_default='b2_native'), schema=settings.DB_SCHEMA)
+    # Inspection to make migration idempotent
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    columns = [c['name'] for c in inspector.get_columns('photos', schema=settings.DB_SCHEMA)]
+
+    if 'storage_provider' not in columns:
+        op.add_column('photos', sa.Column('storage_provider', sa.String(length=20), nullable=False, server_default='b2_native'), schema=settings.DB_SCHEMA)
 
 
 def downgrade() -> None:
