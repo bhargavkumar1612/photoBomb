@@ -34,10 +34,16 @@ ENV CMAKE_BUILD_PARALLEL_LEVEL=1
 ENV MAKEFLAGS="-j 1"
 
 # Install Python dependencies
-# We copy only requirements first to leverage Docker cache
+# 1. Install heavy dependencies (cached layer)
+COPY requirements-base.txt .
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip setuptools wheel && \
+    pip install -r requirements-base.txt
+
+# 2. Install application dependencies (frequently changing layer)
 COPY requirements.txt .
-RUN pip install --no-cache-dir -U pip setuptools wheel && \
-    pip install --no-cache-dir -r requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -r requirements.txt
 
 # Create a non-root user for security
 RUN groupadd -r appuser && useradd -r -g appuser appuser
