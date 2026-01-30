@@ -23,9 +23,15 @@ RUN apt-get update && apt-get install -y \
     postgresql-client \
     curl \
     cmake \
+    libopenblas-dev \
+    liblapack-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
+
+# Limit compilation threads to prevent OOM
+ENV CMAKE_BUILD_PARALLEL_LEVEL=1
+ENV MAKEFLAGS="-j 1"
 
 # Install Python dependencies
 # We copy only requirements first to leverage Docker cache
