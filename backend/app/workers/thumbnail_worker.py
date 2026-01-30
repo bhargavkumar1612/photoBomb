@@ -247,7 +247,7 @@ def process_upload(self, upload_id: str, photo_id: str):
                         print(f"Source key {source_key} failed: {e}. Trying destination {dest_key}...")
                         original_bytes = storage.download_file_bytes(dest_key)
                         # If successful, no need to re-upload/move
-                        upload_id = str(photo.photo_id) 
+                        current_upload_id = str(photo.photo_id) 
 
                 except Exception as e:
                     print(f"Critical: Could not find original file for photo {photo_id}: {e}")
@@ -255,7 +255,11 @@ def process_upload(self, upload_id: str, photo_id: str):
                     return
 
                 # If we moved it effectively by downloading, we should re-upload to key expected by API if they differ
-                if upload_id != str(photo.photo_id):
+                # Compare the original argument 'upload_id' with the photo id
+                if 'current_upload_id' in locals() and current_upload_id == str(photo.photo_id):
+                    # It was found at destination, so no move needed.
+                    pass
+                elif upload_id != str(photo.photo_id):
                     print(f"Moving to {dest_key}")
                     try:
                          storage.upload_bytes(
