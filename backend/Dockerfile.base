@@ -1,33 +1,26 @@
-# Use PyTorch runtime version as the base
-FROM pytorch/pytorch:2.2.1-runtime
+# Using 2.5.1 for better registry reliability
+FROM pytorch/pytorch:2.5.1-runtime
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# Install system dependencies needed for compilation and image processing
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
     cmake \
     pkg-config \
-    libffi-dev \
     libvips-dev \
-    libglib2.0-dev \
-    libexpat1-dev \
-    libgirepository1.0-dev \
-    libpq-dev \
     libopenblas-dev \
     liblapack-dev \
+    python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install heavy Python dependencies
-# We do this here so Render doesn't have to compile them
+# Install your heavy-lifting ML libs
+# We specify +cpu to keep the image from ballooning
 RUN pip install --no-cache-dir \
     numpy==1.26.4 \
-    scikit-learn>=1.4.0 \
+    scikit-learn \
     face_recognition==1.3.0 \
     transformers \
-    torchvision==0.17.1+cpu \
     --extra-index-url https://download.pytorch.org/whl/cpu
-
-# The image is now "pre-baked" with everything Render struggles with.
