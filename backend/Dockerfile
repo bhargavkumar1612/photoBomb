@@ -1,10 +1,12 @@
-FROM python:3.11-slim-bookworm
+# Use PyTorch CPU runtime as base to save ~2GB of download/install time
+FROM pytorch/pytorch:2.2.1-cpu-runtime
 
 # Set environment variables
-# Prevents Python from writing pyc files to disc
 ENV PYTHONDONTWRITEBYTECODE=1
-# Prevents Python from buffering stdout and stderr (faster logs)
 ENV PYTHONUNBUFFERED=1
+# Limit compilation threads to prevent OOM
+ENV CMAKE_BUILD_PARALLEL_LEVEL=4
+ENV MAKEFLAGS="-j 4"
 
 # Install system dependencies
 # libvips-dev: Image processing
@@ -14,7 +16,6 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     pkg-config \
     libffi-dev \
-    python3-dev \
     libvips-dev \
     libglib2.0-dev \
     libexpat1-dev \
@@ -29,21 +30,18 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Limit compilation threads to prevent OOM
-ENV CMAKE_BUILD_PARALLEL_LEVEL=1
-ENV MAKEFLAGS="-j 1"
+# Install uv for faster dependency management
+RUN pip install uv
 
-# Install Python dependencies
 # 1. Install heavy dependencies (cached layer)
+# These are already partly in the base image (torch, torchvision)
+# uv will skip what's already installed
 COPY requirements-base.txt .
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --upgrade pip setuptools wheel && \
-    pip install -r requirements-base.txt
+RUN uv pip install --system --no-cache-dir -r requirements-base.txt
 
 # 2. Install application dependencies (frequently changing layer)
 COPY requirements.txt .
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install -r requirements.txt
+RUN uv pip install --system --no-cache-dir -r requirements.txt
 
 # Create a non-root user for security
 RUN groupadd -r appuser && useradd -r -g appuser appuser
