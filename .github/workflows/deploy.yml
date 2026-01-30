@@ -20,7 +20,7 @@ jobs:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_KEY }}
-          source: "."
+          source: "backend/**,scripts/**,docker-compose.yml,render.yaml,wrangler.json"
           target: "/opt/photobomb"
 
       - name: Deploy via SSH

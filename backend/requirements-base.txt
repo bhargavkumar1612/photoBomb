@@ -1,17 +1,16 @@
-# Heavy Machine Learning & Data Science Dependencies
-# These are separated to allow Docker layer caching.
-# Changes to the main requirements.txt (e.g., fastapi, pydantic) won't trigger
-# a rebuild of these heavy libraries.
-
 # --- Core Math & Data ---
 numpy==1.26.4
 scikit-learn>=1.4.0
 
 # --- Face Recognition (Slow Compilation) ---
-# dlib is a dependency of face_recognition and takes a long time to compile.
+# dlib is a dependency of face_recognition. 
+# It will be compiled during build using the MAKEFLAGS="-j1" we set in the Dockerfile.
 face_recognition==1.3.0
 
-# --- AI / Deep Learning (Large Downloads) ---
+# --- AI / Deep Learning (CPU Specific) ---
+# We use the CPU-specific index to avoid downloading 2GB+ of CUDA binaries
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+torch==2.2.1+cpu
+torchvision==0.17.1+cpu
 transformers
-torch
-torchvision
