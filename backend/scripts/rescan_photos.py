@@ -1,6 +1,10 @@
 import asyncio
 import os
 import sys
+from dotenv import load_dotenv
+
+# Load env before importing app modules
+load_dotenv()
 import tempfile
 import logging
 from sqlalchemy import select
@@ -111,6 +115,11 @@ async def process_photo(db, photo):
             category = res['category']
             
             # Find or Create Tag
+            from app.services.classifier import determine_category
+            
+            # Re-determine category to ensure it matches current logic (e.g. people)
+            category = determine_category(label)
+            
             result = await db.execute(select(Tag).where(Tag.name == label))
             existing_tag = result.scalar_one_or_none()
             
@@ -122,7 +131,8 @@ async def process_photo(db, photo):
                 tag_id = new_tag.tag_id
             else:
                 tag_id = existing_tag.tag_id
-                if existing_tag.category == "general" and category != "general":
+                # Force update category if it's general or incorrect
+                if existing_tag.category != category:
                     existing_tag.category = category
                     db.add(existing_tag)
             
