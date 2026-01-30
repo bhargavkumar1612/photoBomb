@@ -1,6 +1,3 @@
-
-import numpy as np
-from sklearn.cluster import DBSCAN
 from sqlalchemy import select, and_
 from app.models.person import Face, Person
 from app.models.photo import Photo
@@ -11,6 +8,8 @@ async def cluster_faces(user_id: uuid.UUID):
     """
     Cluster unassigned faces for a user into persons using DBSCAN.
     """
+    import numpy as np
+    from sklearn.cluster import DBSCAN
     async with AsyncSessionLocal() as db:
         # Fetch all faces for user that are NOT assigned to a person yet
         # We need to join with Photo to filter by user_id

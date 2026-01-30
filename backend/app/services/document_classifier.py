@@ -1,7 +1,5 @@
-
 from typing import List, Dict, Any
 import logging
-from transformers import pipeline
 
 logger = logging.getLogger(__name__)
 
@@ -41,9 +39,14 @@ def get_document_classifier():
         return _model_cache["doc_classifier"]
 
     logger.info("Loading CLIP model for granular document classification...")
-    classifier = pipeline("zero-shot-image-classification", model="openai/clip-vit-base-patch32")
-    _model_cache["doc_classifier"] = classifier
-    return classifier
+    try:
+        from transformers import pipeline
+        classifier = pipeline("zero-shot-image-classification", model="openai/clip-vit-base-patch32")
+        _model_cache["doc_classifier"] = classifier
+        return classifier
+    except ImportError as e:
+        logger.error(f"Transformers not installed: {e}")
+        raise e
 
 def classify_document(image_path: str, threshold: float = 0.3) -> List[Dict[str, Any]]:
     """

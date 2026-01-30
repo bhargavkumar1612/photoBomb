@@ -1,7 +1,4 @@
-import torch
 from PIL import Image
-from transformers import DetrImageProcessor, DetrForObjectDetection
-from transformers import CLIPProcessor, CLIPModel
 from typing import List, Dict, Any, Tuple
 import logging
 
@@ -17,6 +14,7 @@ def get_detr_model():
     global _detr_processor, _detr_model
     if _detr_model is None:
         logger.info("Loading DETR model for animal detection...")
+        from transformers import DetrImageProcessor, DetrForObjectDetection
         _detr_processor = DetrImageProcessor.from_pretrained("facebook/detr-resnet-50")
         _detr_model = DetrForObjectDetection.from_pretrained("facebook/detr-resnet-50", use_safetensors=False)
     return _detr_processor, _detr_model
@@ -25,6 +23,7 @@ def get_clip_model():
     global _clip_model, _clip_processor
     if _clip_model is None:
         logger.info("Loading CLIP model for animal embeddings...")
+        from transformers import CLIPProcessor, CLIPModel
         _clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
         _clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
     return _clip_processor, _clip_model
@@ -38,6 +37,7 @@ def detect_animals(image_path: str, threshold: float = 0.7) -> List[Dict[str, An
     Detect animals in an image and return bounding boxes and labels.
     """
     try:
+        import torch
         processor, model = get_detr_model()
         image = Image.open(image_path).convert("RGB")
         inputs = processor(images=image, return_tensors="pt")
@@ -69,6 +69,7 @@ def get_animal_embedding(image_path: str, box: List[float]) -> List[float]:
     Crop an animal from the image and get its CLIP embedding.
     """
     try:
+        import torch
         processor, model = get_clip_model()
         image = Image.open(image_path).convert("RGB")
         

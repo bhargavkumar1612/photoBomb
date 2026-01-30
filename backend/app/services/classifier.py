@@ -1,9 +1,4 @@
 from typing import List, Dict, Any
-try:
-    from transformers import pipeline
-    HAS_TRANSFORMERS = True
-except ImportError:
-    HAS_TRANSFORMERS = False
 
 _model_cache = {}
 
@@ -29,14 +24,15 @@ def get_scene_classifier():
     if "scene_classifier" in _model_cache:
         return _model_cache["scene_classifier"]
 
-    if not HAS_TRANSFORMERS:
-        raise ImportError("transformers library not installed")
-
     print("Loading CLIP model for scene classification...")
-    # Use CPU by default or whatever is optimal. Transformers handles MPS/CUDA if available usually.
-    classifier = pipeline("zero-shot-image-classification", model="openai/clip-vit-base-patch32")
-    _model_cache["scene_classifier"] = classifier
-    return classifier
+    try:
+        from transformers import pipeline
+        # Use CPU by default or whatever is optimal. Transformers handles MPS/CUDA if available usually.
+        classifier = pipeline("zero-shot-image-classification", model="openai/clip-vit-base-patch32")
+        _model_cache["scene_classifier"] = classifier
+        return classifier
+    except ImportError:
+        raise ImportError("transformers library not installed")
 
 def determine_category(label: str) -> str:
     """Map a label to a fixed category."""

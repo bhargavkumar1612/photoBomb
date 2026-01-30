@@ -1,5 +1,3 @@
-import numpy as np
-from sklearn.cluster import DBSCAN
 from sqlalchemy import select, and_
 from app.models.animal import Animal, AnimalDetection
 from app.models.photo import Photo
@@ -14,6 +12,8 @@ async def cluster_animals(user_id: uuid.UUID, force_reset: bool = False):
     Cluster animal detections for a user into Animal entities.
     Uses DBSCAN on 512-d CLIP embeddings.
     """
+    import numpy as np
+    from sklearn.cluster import DBSCAN
     async with AsyncSessionLocal() as db:
         if force_reset:
             # Unassign all animals for this user that don't have a custom name
