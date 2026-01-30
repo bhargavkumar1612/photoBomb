@@ -1,12 +1,7 @@
 name: Build and Push Base Image
 
 on:
-  workflow_dispatch: # Allow manual trigger
-  push:
-    paths:
-      - 'backend/Dockerfile.base'
-      - 'backend/requirements-base.txt'
-      - '.github/workflows/build-base-image.yml'
+  workflow_dispatch: # Manual trigger only
 
 jobs:
   build-base:
