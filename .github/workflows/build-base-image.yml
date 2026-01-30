@@ -29,6 +29,8 @@ jobs:
           file: ./backend/Dockerfile.base
           platforms: linux/amd64 # Render uses amd64
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/photobomb-base:latest
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/photobomb-base:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/photobomb-base:v1
           cache-from: type=gha
           cache-to: type=gha,mode=max
