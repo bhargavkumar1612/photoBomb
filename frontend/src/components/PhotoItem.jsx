@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import HorizontalLoader from './HorizontalLoader'
-import { Heart, Trash2, Download, Info, Share2, FolderPlus, Loader2, CheckSquare } from 'lucide-react'
+import { Heart, Trash2, Download, Info, Share2, FolderPlus, Loader2, CheckSquare, MinusCircle } from 'lucide-react'
 
 export default function PhotoItem({
     photo,
@@ -16,14 +16,30 @@ export default function PhotoItem({
     onInfo,
     onShare,
     onAddToAlbum,
+    isRemoveAction = false,
     readonly = false
 }) {
     const [imageLoaded, setImageLoaded] = useState(false)
     const [hasError, setHasError] = useState(false)
     const token = localStorage.getItem('access_token')
 
+    // Handler for Enter key on the card itself
+    const handleKeyDown = (e) => {
+        if (e.key === 'Enter') {
+            if (selectionMode) {
+                onToggleSelection(photo.photo_id)
+            } else {
+                onLightbox(photo)
+            }
+        }
+    }
+
     return (
-        <div className={`photo-card ${isSelected ? 'selected' : ''}`}>
+        <div
+            className={`photo-card ${isSelected ? 'selected' : ''}`}
+            tabIndex={0} // Make focusable
+            onKeyDown={handleKeyDown}
+        >
             {selectionMode && (
                 <div
                     className={`photo-selection-indicator ${isSelected ? 'selected' : ''}`}
@@ -107,12 +123,18 @@ export default function PhotoItem({
 
                             {onDelete && (
                                 <button
-                                    className="delete-btn"
+                                    className={`delete-btn ${isRemoveAction ? 'remove-btn' : ''}`}
                                     onClick={(e) => { e.stopPropagation(); onDelete(photo.photo_id, photo.filename) }}
                                     disabled={isDeleting}
-                                    title="Delete"
+                                    title={isRemoveAction ? "Remove from album" : "Delete"}
                                 >
-                                    {isDeleting ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={20} />}
+                                    {isDeleting ? (
+                                        <Loader2 size={18} className="animate-spin" />
+                                    ) : isRemoveAction ? (
+                                        <MinusCircle size={20} />
+                                    ) : (
+                                        <Trash2 size={20} />
+                                    )}
                                 </button>
                             )}
                         </>
@@ -130,12 +152,16 @@ export default function PhotoItem({
                         <button className="overlay-btn" onClick={(e) => { e.stopPropagation(); onInfo(photo) }} title="Info">
                             <Info size={18} />
                         </button>
-                        <button className="overlay-btn" onClick={(e) => { e.stopPropagation(); onShare(photo) }} title="Share">
-                            <Share2 size={18} />
-                        </button>
-                        <button className="overlay-btn" onClick={(e) => { e.stopPropagation(); onAddToAlbum(photo) }} title="Add to album">
-                            <FolderPlus size={18} />
-                        </button>
+                        {!readonly && (
+                            <>
+                                <button className="overlay-btn" onClick={(e) => { e.stopPropagation(); onShare(photo) }} title="Share">
+                                    <Share2 size={18} />
+                                </button>
+                                <button className="overlay-btn" onClick={(e) => { e.stopPropagation(); onAddToAlbum(photo) }} title="Add to album">
+                                    <FolderPlus size={18} />
+                                </button>
+                            </>
+                        )}
                     </div>
                 </div>
             )}

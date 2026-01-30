@@ -17,6 +17,7 @@ import Masonry from 'react-masonry-css'
 import Lightbox from '../components/Lightbox'
 import SearchBar from '../components/SearchBar'
 import AddToAlbumModal from '../components/AddToAlbumModal'
+import ShareModal from '../components/ShareModal'
 import PhotoCardSkeleton from '../components/skeletons/PhotoCardSkeleton'
 import PhotoItem from '../components/PhotoItem'
 import api from '../services/api'
@@ -43,6 +44,7 @@ export default function Timeline({ favoritesOnly = false }) {
     const [lightboxPhoto, setLightboxPhoto] = useState(null)
     const [showAlbumModal, setShowAlbumModal] = useState(false)
     const [batchAlbumPhotoIds, setBatchAlbumPhotoIds] = useState([])
+    const [sharePhotoIds, setSharePhotoIds] = useState(null)
 
     const { data, isLoading, error } = useQuery({
         queryKey: ['photos'],
@@ -151,14 +153,7 @@ export default function Timeline({ favoritesOnly = false }) {
     }
 
     const handleShare = (photo) => {
-        const apiBaseUrl = import.meta.env.VITE_API_URL || `${window.location.origin}/api/v1`
-        const url = photo.thumb_urls.original || `${apiBaseUrl}/photos/${photo.photo_id}/download`
-        if (navigator.share) {
-            navigator.share({ title: photo.filename, url })
-        } else {
-            navigator.clipboard.writeText(url)
-            alert('Link copied!')
-        }
+        setSharePhotoIds([photo.photo_id])
     }
 
     const handleInfo = (photo) => {
@@ -236,12 +231,18 @@ export default function Timeline({ favoritesOnly = false }) {
                                 <h1
                                     className={`header-tab ${!showFavoritesOnly ? 'active' : ''}`}
                                     onClick={() => setShowFavoritesOnly(false)}
+                                    tabIndex={0}
+                                    role="button"
+                                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowFavoritesOnly(false); } }}
                                 >
                                     Photos
                                 </h1>
                                 <h1
                                     className={`header-tab ${showFavoritesOnly ? 'active' : ''}`}
                                     onClick={() => setShowFavoritesOnly(true)}
+                                    tabIndex={0}
+                                    role="button"
+                                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowFavoritesOnly(true); } }}
                                 >
                                     Favorites
                                 </h1>
@@ -364,6 +365,10 @@ export default function Timeline({ favoritesOnly = false }) {
                             <div className="sub-header-right">
                                 {selectedPhotos.size > 0 && (
                                     <div className="selection-actions">
+                                        <button className="btn-secondary" onClick={() => setSharePhotoIds(Array.from(selectedPhotos))}>
+                                            <Share2 size={16} />
+                                            <span>Share</span>
+                                        </button>
                                         <button className="btn-secondary" onClick={handleBulkAddToAlbum}>
                                             <FolderPlus size={16} />
                                             <span>Add to Album</span>
@@ -400,6 +405,9 @@ export default function Timeline({ favoritesOnly = false }) {
                                         {selectionMode && (
                                             <div
                                                 className={`group-checkbox ${isGroupSelected ? 'selected' : ''} ${isGroupPartiallySelected ? 'partial' : ''}`}
+                                                tabIndex={0}
+                                                role="checkbox"
+                                                aria-checked={isGroupSelected ? "true" : isGroupPartiallySelected ? "mixed" : "false"}
                                                 onClick={() => {
                                                     const newSelection = new Set(selectedPhotos)
                                                     if (isGroupSelected) {
@@ -408,6 +416,18 @@ export default function Timeline({ favoritesOnly = false }) {
                                                         groupPhotoIds.forEach(id => newSelection.add(id))
                                                     }
                                                     setSelectedPhotos(newSelection)
+                                                }}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter' || e.key === ' ') {
+                                                        e.preventDefault()
+                                                        const newSelection = new Set(selectedPhotos)
+                                                        if (isGroupSelected) {
+                                                            groupPhotoIds.forEach(id => newSelection.delete(id))
+                                                        } else {
+                                                            groupPhotoIds.forEach(id => newSelection.add(id))
+                                                        }
+                                                        setSelectedPhotos(newSelection)
+                                                    }
                                                 }}
                                                 style={{
                                                     display: 'inline-flex',
@@ -472,6 +492,12 @@ export default function Timeline({ favoritesOnly = false }) {
                     isOpen={showAlbumModal}
                     onClose={() => setShowAlbumModal(false)}
                     photoIds={batchAlbumPhotoIds}
+                />
+
+                <ShareModal
+                    isOpen={!!sharePhotoIds}
+                    onClose={() => setSharePhotoIds(null)}
+                    photoIds={sharePhotoIds || []}
                 />
             </div>
         </div>

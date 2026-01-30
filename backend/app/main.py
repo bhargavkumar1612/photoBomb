@@ -15,9 +15,12 @@ from app.routers import sharing
 async def lifespan(app: FastAPI):
     """Application lifespan events."""
     # Startup
+    print("DEBUG: Starting init_db()...")
     await init_db()
+    print("DEBUG: init_db() complete.")
     yield
     # Shutdown
+    print("DEBUG: Shutting down db...")
     await close_db()
 
 

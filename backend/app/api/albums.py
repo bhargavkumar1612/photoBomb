@@ -126,20 +126,14 @@ async def list_albums(
     """Get all albums for current user (owned + shared)."""
     from sqlalchemy import func, and_
     
-    # 1. Fetch albums (Owned + Shared)
+    # 1. Fetch albums (Owned only - Shared moved to /sharing/inbox)
     result = await db.execute(
         select(Album)
-        .outerjoin(album_contributors, Album.album_id == album_contributors.c.album_id)
         .options(
             selectinload(Album.contributors),
             selectinload(Album.cover_photo)
         )
-        .where(
-            or_(
-                Album.user_id == current_user.user_id,
-                album_contributors.c.user_id == current_user.user_id
-            )
-        )
+        .where(Album.user_id == current_user.user_id)
         .order_by(Album.updated_at.desc())
         .distinct()
     )

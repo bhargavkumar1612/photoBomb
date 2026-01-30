@@ -31,6 +31,7 @@ A production-ready photo service (PWA) with full planning documentation and work
 - **Hybrid Storage** (B2, S3, R2 support with per-photo provider tracking)
 - **Visual Hashtags** (Unified object/scene detection with optimized batch fetching)
 - **Maintainability** (Database keep-alive heartbeat via Celery)
+- **Keyboard Accessibility** (Global focus management, Modal navigation, Keyboard shortcuts)
 
 **📋 Planned:**
 - Search & Discovery (Text + Semantic)

@@ -1,0 +1,63 @@
+.confirmation-modal {
+    max-width: 400px !important;
+    text-align: center;
+    padding: 32px 24px 24px 24px !important;
+}
+
+.confirmation-header {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 20px;
+}
+
+.icon-badge {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.icon-badge.primary {
+    background: rgba(79, 70, 229, 0.1);
+    color: #4f46e5;
+}
+
+.icon-badge.destructive {
+    background: #fee2e2;
+    color: #ef4444;
+}
+
+.confirmation-body h3 {
+    margin: 0 0 8px 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #111827;
+}
+
+.confirmation-body p {
+    margin: 0 0 24px 0;
+    color: #6b7280;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.confirmation-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+
+.confirmation-actions button {
+    flex: 1;
+    justify-content: center;
+}
+
+.btn-danger {
+    background-color: #ef4444 !important;
+}
+
+.btn-danger:hover {
+    background-color: #dc2626 !important;
+}

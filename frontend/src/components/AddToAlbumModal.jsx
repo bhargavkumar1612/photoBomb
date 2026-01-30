@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { X, Plus, Folder, Loader2 } from 'lucide-react';
 import api from '../services/api';
+import { useModalKeyboard } from '../hooks/useModalKeyboard';
 import './AddToAlbumModal.css';
 
 export default function AddToAlbumModal({ isOpen, onClose, photoIds = [] }) {
@@ -68,6 +69,8 @@ export default function AddToAlbumModal({ isOpen, onClose, photoIds = [] }) {
 
     const isProcessing = addToAlbumMutation.isPending || createAlbumMutation.isPending;
 
+    useModalKeyboard({ isOpen, onClose })
+
     return (
         <div className="modal-overlay">
             <div className="modal-content">
@@ -126,6 +129,12 @@ export default function AddToAlbumModal({ isOpen, onClose, photoIds = [] }) {
                                     key={album.album_id}
                                     className="album-item"
                                     onClick={() => handleSelectAlbum(album.album_id)}
+                                    tabIndex={0}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            handleSelectAlbum(album.album_id)
+                                        }
+                                    }}
                                 >
                                     <div className="album-icon">
                                         {album.cover_photo_url ? (

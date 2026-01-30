@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Trash & Restore**: Soft delete functionality for photos with a Trash view and Restore/Permanent Delete options.
 - **Secure Image Serving**: Implemented Ahead-Of-Time (AOT) Presigned URLs to serve all images securely without JWTs in URLs.
 - **Share Modal Improvements**: Enhanced UI with tabbed interface separating "Public Links" and "Viewers", displaying aggregated viewer list across all share links.
+- **Keyboard Accessibility**: Full keyboard navigation support across the application. Implemented global focus rings, `Escape` to close modals, `Enter` to confirm actions, and focusable photo grid items.
+- **Sharing Inbox Redesign**: Overhauled the Sharing Inbox with a modern grid layout for shared albums, drilling down into sender-specific views, and consistent date-grouped masonry layouts for shared photos.
 
 ### Changed
 - **Gallery UI Overhaul**: Complete redesign of the photo timeline with premium glassmorphism aesthetics, contextual selection headers, and refined spacing.
@@ -38,6 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Documentation Audit**: Synchronized all docs with codebase reality - marked Albums as Complete, Face Recognition & Sharing as In Progress.
 - **Visual Hashtags Rebranding**: Renamed "Documents" feature to "Hashtags" across backend APIs, frontend routes, and UI components. Updated sidebar and detail views to use the new nomenclature and icons.
 - **SQLAlchemy Optimization**: Resolved SQLAlchemy `SAWarning` related to overlapping relationships by adding the `overlaps` parameter to `Tag` and `Photo` models.
+- **Sharing Permissions**: Enforced stricter permissions for shared content. Recipients cannot re-share items or add them to other albums. Contributors to shared albums can only delete their own photos.
+- **Shared Album Navigation**: Improved navigation flow with dynamic "Back" buttons and exclusion of shared albums from the main "Albums" listing to reduce clutter.
 
 ### Fixed
 - **Selection Mode Crash**: Resolved `ReferenceError` for `CheckSquare` icon in PhotoItem component.
@@ -52,6 +56,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Database Migrations**: Refactored Alembic migrations to be idempotent and robust against re-runs.
 - **Security**: Added `Cross-Origin-Opener-Policy` (COOP) header to backend responses.
 - **Process Management**: Optimized Uvicorn worker count and added interaction checks to maintenance scripts.
+- **Date Handling**: Fixed `Invalid Date` errors in sharing views by implementing `shared_at` timestamp and fallback logic for `uploaded_at`.
+- **Album Covers**: Added fallback logic to use the first photo as a thumbnail if an album has no explicit cover photo set.
 
 ## [0.1.0] - 2024-12-10
 ### Added

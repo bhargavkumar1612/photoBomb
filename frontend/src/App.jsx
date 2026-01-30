@@ -12,6 +12,7 @@ import Settings from './pages/Settings'
 import Albums from './pages/Albums'
 import AlbumDetail from './pages/AlbumDetail'
 import SharedAlbumView from './pages/SharedAlbumView'
+import Sharing from './pages/Sharing'
 import Trash from './pages/Trash'
 import MapPage from './pages/MapPage'
 import PeoplePage from './pages/PeoplePage'
@@ -79,7 +80,7 @@ function App() {
                         }>
                             <Route path="/" element={<Timeline />} />
                             <Route path="/explore" element={<PlaceholderPage title="Explore" />} />
-                            <Route path="/sharing" element={<PlaceholderPage title="Sharing" />} />
+                            <Route path="/sharing" element={<Sharing />} />
                             <Route path="/albums" element={<Albums />} />
                             <Route path="/albums/:albumId" element={<AlbumDetail />} />
                             <Route path="/shared/:token" element={<SharedAlbumView />} />

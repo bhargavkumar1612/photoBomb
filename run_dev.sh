@@ -23,9 +23,15 @@ echo "🚀 Starting PhotoBomb Development Environment..."
 
 # Check if port 8000 is free (Backend)
 if lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null ; then
-    echo "⚠️  Port 8000 is busy. Please free it first."
-    kill $(lsof -ti:8000)
-    # exit 1
+    echo "⚠️  Port 8000 is busy. Killing process..."
+    PID=$(lsof -ti:8000)
+    kill -9 $PID
+    
+    # Wait for port to be free
+    while lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null; do
+        sleep 0.1
+    done
+    echo "✅ Port 8000 freed."
 fi
 
 # Check if port 3000 is free (Frontend)

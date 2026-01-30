@@ -40,6 +40,8 @@ class PhotoForSharedView(BaseModel):
     filename: str
     thumb_urls: dict
     taken_at: Optional[datetime]
+    uploaded_at: Optional[datetime] = None
+    shared_at: Optional[datetime] = None
     owner: Optional[PhotoOwnerInfo] = None
 
 class SharedAlbumView(BaseModel):
@@ -48,3 +50,37 @@ class SharedAlbumView(BaseModel):
     album_description: Optional[str]
     owner_name: str
     photos: List[PhotoForSharedView]
+
+class SharePhotosRequest(BaseModel):
+    photo_ids: List[str]
+    target_email: str
+
+class SharePhotosResponse(BaseModel):
+    status: str # "shared" or "link"
+    link: Optional[str] = None
+    message: str
+
+class ConnectionUser(BaseModel):
+    user_id: Optional[UUID]
+    full_name: str
+    email: str
+    avatar_url: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
+class SharedAlbumSummary(BaseModel):
+    album_id: str
+    name: str
+    photo_count: int
+    cover_photo_url: Optional[str] = None
+    created_at: datetime
+    
+class InboxItem(BaseModel):
+    sender: ConnectionUser
+    photo_count: int
+    album_count: int = 0
+    latest_share_date: datetime
+    preview_thumbs: List[str] # List of signed URLs for preview
+    photos: List[PhotoForSharedView] = []
+    albums: List[SharedAlbumSummary] = []

@@ -4,13 +4,12 @@ import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 import { Trash2 } from 'lucide-react'
 import AlbumCardSkeleton from '../components/skeletons/AlbumCardSkeleton'
 import api from '../services/api'
+import { useModalKeyboard } from '../hooks/useModalKeyboard'
 import './Albums.css'
 
 export default function Albums() {
     const queryClient = useQueryClient()
     const [showCreateModal, setShowCreateModal] = useState(false)
-    const [newAlbumName, setNewAlbumName] = useState('')
-    const [newAlbumDescription, setNewAlbumDescription] = useState('')
 
     const { data: albums, isLoading } = useQuery({
         queryKey: ['albums'],
@@ -42,17 +41,7 @@ export default function Albums() {
         }
     })
 
-    const handleCreateAlbum = () => {
-        if (!newAlbumName.trim()) {
-            alert('Album name is required')
-            return
-        }
 
-        createMutation.mutate({
-            name: newAlbumName,
-            description: newAlbumDescription || null
-        })
-    }
 
     const handleDeleteAlbum = (albumId, albumName) => {
         if (window.confirm(`Delete album "${albumName}"? Photos will not be deleted.`)) {
@@ -151,49 +140,74 @@ export default function Albums() {
             )}
 
             {/* Create Album Modal */}
-            {showCreateModal && (
-                <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
-                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h2>Create New Album</h2>
-                            <button className="modal-close" onClick={() => setShowCreateModal(false)}>×</button>
+            <CreateAlbumModal
+                isOpen={showCreateModal}
+                onClose={() => setShowCreateModal(false)}
+                onCreate={(name, desc) => createMutation.mutate({ name, description: desc })}
+                isLoading={createMutation.isPending}
+            />
+        </div>
+    )
+}
+
+function CreateAlbumModal({ isOpen, onClose, onCreate, isLoading }) {
+    const [name, setName] = useState('')
+    const [description, setDescription] = useState('')
+
+    useModalKeyboard({ isOpen, onClose })
+
+    const handleSubmit = () => {
+        if (!name.trim()) return
+        onCreate(name, description || null)
+        setName('')
+        setDescription('')
+    }
+
+    if (!isOpen) return null
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                    <h2>Create New Album</h2>
+                    <button className="modal-close" onClick={onClose}>×</button>
+                </div>
+                <div className="modal-body">
+                    <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
+                        <div className="form-group">
+                            <label>Album Name *</label>
+                            <input
+                                type="text"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                placeholder="My Album"
+                                autoFocus
+                            />
                         </div>
-                        <div className="modal-body">
-                            <div className="form-group">
-                                <label>Album Name *</label>
-                                <input
-                                    type="text"
-                                    value={newAlbumName}
-                                    onChange={(e) => setNewAlbumName(e.target.value)}
-                                    placeholder="My Album"
-                                    autoFocus
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label>Description</label>
-                                <textarea
-                                    value={newAlbumDescription}
-                                    onChange={(e) => setNewAlbumDescription(e.target.value)}
-                                    placeholder="Optional description..."
-                                    rows={3}
-                                />
-                            </div>
+                        <div className="form-group">
+                            <label>Description</label>
+                            <textarea
+                                value={description}
+                                onChange={(e) => setDescription(e.target.value)}
+                                placeholder="Optional description..."
+                                rows={3}
+                            />
                         </div>
                         <div className="modal-footer">
-                            <button className="btn-secondary" onClick={() => setShowCreateModal(false)}>
+                            <button type="button" className="btn-secondary" onClick={onClose}>
                                 Cancel
                             </button>
                             <button
+                                type="submit"
                                 className="btn-primary"
-                                onClick={handleCreateAlbum}
-                                disabled={createMutation.isLoading}
+                                disabled={isLoading}
                             >
-                                {createMutation.isLoading ? 'Creating...' : 'Create Album'}
+                                {isLoading ? 'Creating...' : 'Create Album'}
                             </button>
                         </div>
-                    </div>
+                    </form>
                 </div>
-            )}
+            </div>
         </div>
     )
 }

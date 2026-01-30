@@ -8,13 +8,16 @@ import PhotoPickerModal from '../components/PhotoPickerModal'
 import ShareModal from '../components/ShareModal'
 import PhotoItem from '../components/PhotoItem'
 import PhotoCardSkeleton from '../components/skeletons/PhotoCardSkeleton'
+import ConfirmationModal from '../components/ConfirmationModal'
 import api from '../services/api'
+import { useAuth } from '../context/AuthContext'
 import { usePhotoFilter } from '../hooks/usePhotoFilter'
 import './Timeline.css' // Reuse Timeline styles for Masonry/Grid
 import './AlbumDetail.css'
 
 export default function AlbumDetail() {
     const { albumId } = useParams()
+    const { user } = useAuth()
     const navigate = useNavigate()
     const queryClient = useQueryClient()
     const [lightboxPhoto, setLightboxPhoto] = useState(null)
@@ -91,9 +94,17 @@ export default function AlbumDetail() {
     })
 
 
+    const [photoToRemove, setPhotoToRemove] = useState(null)
+    const [sharePhotoIds, setSharePhotoIds] = useState(null)
+
     const handleRemoveFromAlbum = (photoId) => {
-        if (window.confirm('Remove photo from album?')) {
-            removeMutation.mutate(photoId)
+        setPhotoToRemove(photoId)
+    }
+
+    const confirmRemove = () => {
+        if (photoToRemove) {
+            removeMutation.mutate(photoToRemove)
+            setPhotoToRemove(null)
         }
     }
 
@@ -113,6 +124,10 @@ export default function AlbumDetail() {
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
+    }
+
+    const handleShare = (photo) => {
+        setSharePhotoIds([photo.photo_id])
     }
 
     const breakpointColumns = {
@@ -151,9 +166,9 @@ export default function AlbumDetail() {
         <div className="timeline-container album-detail-container">
             {/* Header */}
             <div className="album-detail-header">
-                <button className="btn-back" onClick={() => navigate('/albums')}>
+                <button className="btn-back" onClick={() => navigate(album.is_owner ? '/albums' : '/sharing')}>
                     <ArrowLeft size={18} />
-                    Back to Albums
+                    {album.is_owner ? 'Back to Albums' : 'Back to Sharing'}
                 </button>
                 <div className="album-detail-info">
                     <h1>{album.name}</h1>
@@ -232,10 +247,11 @@ export default function AlbumDetail() {
                             onLightbox={setLightboxPhoto}
                             onFavorite={() => { }} // TODO: Add favorite mutation if needed, or pass empty
                             isDeleting={false}
-                            onDelete={album.is_owner ? (id) => handleRemoveFromAlbum(id) : undefined}
+                            onDelete={(album.is_owner || (user && photo.owner && photo.owner.user_id === user.id)) ? (id) => handleRemoveFromAlbum(id) : undefined}
+                            isRemoveAction={true}
                             onDownload={handleDownload}
                             onInfo={() => alert(`File: ${photo.filename}`)}
-                            onShare={() => { }}
+                            onShare={handleShare}
                             onAddToAlbum={() => { }} // Disable or implement later
                         />
                     ))}
@@ -262,9 +278,10 @@ export default function AlbumDetail() {
 
             {/* Share Modal */}
             <ShareModal
-                isOpen={isShareModalOpen}
-                onClose={() => setIsShareModalOpen(false)}
-                albumId={albumId}
+                isOpen={isShareModalOpen || !!sharePhotoIds}
+                onClose={() => { setIsShareModalOpen(false); setSharePhotoIds(null); }}
+                albumId={sharePhotoIds ? null : albumId}
+                photoIds={sharePhotoIds || []}
             />
 
             {/* Contributor Management Modal */}
@@ -365,6 +382,18 @@ export default function AlbumDetail() {
                     </div>
                 </div>
             )}
+
+            {/* Confirmation Modal */}
+            <ConfirmationModal
+                isOpen={!!photoToRemove}
+                onClose={() => setPhotoToRemove(null)}
+                onConfirm={confirmRemove}
+                title="Remove from Album"
+                message="Are you sure you want to remove this photo from the album? It will remain in your library."
+                confirmText="Remove"
+                cancelText="Keep"
+                isDestructive={false}
+            />
         </div>
     )
 }

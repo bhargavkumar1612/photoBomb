@@ -1,5 +1,7 @@
-export const groupPhotosByDate = (photos) => {
+export const groupPhotosByDate = (photos, options = {}) => {
     if (!photos || photos.length === 0) return [];
+
+    const { dateField = null } = options;
 
     // Day/Relative grouping (default)
     const groups = {};
@@ -7,12 +9,18 @@ export const groupPhotosByDate = (photos) => {
     today.setHours(0, 0, 0, 0);
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
-    const sevenDaysAgo = new Date(today);
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
+    // ... logic ...
 
     photos.forEach(photo => {
-        const date = new Date(photo.taken_at || photo.uploaded_at);
+        let dateVal = null;
+        if (dateField && photo[dateField]) {
+            dateVal = photo[dateField];
+        } else {
+            dateVal = photo.taken_at || photo.uploaded_at;
+        }
+
+        const date = new Date(dateVal);
         const dateStr = date.toDateString(); // "Fri Jan 11 2026"
 
         let label = '';
@@ -39,9 +47,14 @@ export const groupPhotosByDate = (photos) => {
         if (idxA !== -1) return -1;
         if (idxB !== -1) return 1;
 
-        // Parse date from long string format "Friday, January 10, 2025"
-        const dateA = new Date(a.photos[0].taken_at || a.photos[0].uploaded_at);
-        const dateB = new Date(b.photos[0].taken_at || b.photos[0].uploaded_at);
+        // Parse date from long string format or use first photo's date
+        const getPhotoDate = (p) => {
+            if (dateField && p[dateField]) return new Date(p[dateField]);
+            return new Date(p.taken_at || p.uploaded_at);
+        };
+
+        const dateA = getPhotoDate(a.photos[0]);
+        const dateB = getPhotoDate(b.photos[0]);
         return dateB - dateA;
     });
 

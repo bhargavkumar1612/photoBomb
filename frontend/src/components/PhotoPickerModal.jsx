@@ -1,13 +1,21 @@
-import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Masonry from 'react-masonry-css';
 import { X, Check } from 'lucide-react';
 import api from '../services/api';
+import { useModalKeyboard } from '../hooks/useModalKeyboard';
 import './PhotoPickerModal.css';
 
 export default function PhotoPickerModal({ isOpen, onClose, onAdd, existingPhotoIds = [] }) {
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [searchTerm, setSearchTerm] = useState('');
+
+    const handleAdd = () => {
+        if (selectedIds.size > 0) {
+            onAdd(Array.from(selectedIds));
+        }
+    };
+
+    useModalKeyboard({ isOpen, onClose, onConfirm: handleAdd, confirmOnEnter: true })
 
     // Reuse photos query
     const { data, isLoading } = useQuery({
@@ -35,9 +43,7 @@ export default function PhotoPickerModal({ isOpen, onClose, onAdd, existingPhoto
         setSelectedIds(newSet);
     };
 
-    const handleAdd = () => {
-        onAdd(Array.from(selectedIds));
-    };
+    // ... (rest of filtering logic, no changes needed to logic itself, just re-rendering)
 
     // Filter out already added photos
     const availablePhotos = data?.photos?.filter(p => !existingPhotoIds.includes(p.photo_id)) || [];
@@ -83,6 +89,13 @@ export default function PhotoPickerModal({ isOpen, onClose, onAdd, existingPhoto
                                         key={photo.photo_id}
                                         className={`picker-card ${isSelected ? 'selected' : ''}`}
                                         onClick={() => toggleSelection(photo.photo_id)}
+                                        tabIndex={0}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                e.stopPropagation(); // prevent modal confirm
+                                                toggleSelection(photo.photo_id);
+                                            }
+                                        }}
                                     >
                                         <img
                                             src={photo.thumb_urls.thumb_512}

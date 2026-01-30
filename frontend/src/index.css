@@ -19,6 +19,14 @@
   --shadow-lg: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
 }
 
+/* Global Focus Styles for Accessibility */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+  /* Optional: smooth corners on outline */
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
@@ -30,7 +38,8 @@ body {
 }
 
 /* Loading states */
-.loading, .page-loading {
+.loading,
+.page-loading {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -49,7 +58,8 @@ body {
 }
 
 /* Buttons */
-.btn-primary, .btn-secondary {
+.btn-primary,
+.btn-secondary {
   padding: 0.625rem 1.25rem;
   border-radius: 0.5rem;
   font-size: 0.875rem;

@@ -32,8 +32,14 @@ api.interceptors.response.use(
 
             try {
                 const refreshToken = localStorage.getItem('refresh_token')
-                // Use api instance to ensure correct baseURL in production
-                const response = await api.post('/auth/refresh', {
+
+                if (!refreshToken) {
+                    throw new Error('No refresh token available')
+                }
+
+                // Use plain axios to avoid interceptor infinite loop
+                const apiBaseUrl = import.meta.env.VITE_API_URL || '/api/v1'
+                const response = await axios.post(`${apiBaseUrl}/auth/refresh`, {
                     refresh_token: refreshToken
                 })
 
@@ -44,6 +50,7 @@ api.interceptors.response.use(
                 originalRequest.headers.Authorization = `Bearer ${access_token}`
                 return api(originalRequest)
             } catch (refreshError) {
+                localStorage.removeItem('access_token')
                 localStorage.removeItem('refresh_token')
                 window.location.href = '/login'
                 return Promise.reject(refreshError)

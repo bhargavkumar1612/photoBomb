@@ -537,7 +537,8 @@
     pointer-events: none;
 }
 
-.photo-card:hover .photo-overlay {
+.photo-card:hover .photo-overlay,
+.photo-card:focus-within .photo-overlay {
     opacity: 1;
 }
 
@@ -606,6 +607,18 @@
     border-color: rgba(239, 68, 68, 1) !important;
     box-shadow: 0 8px 24px rgba(239, 68, 68, 0.5) !important;
     transform: scale(1.05) !important;
+}
+
+.delete-btn.remove-btn {
+    background: rgba(245, 158, 11, 0.9) !important;
+    /* Amber-500 */
+    border-color: rgba(245, 158, 11, 0.95) !important;
+}
+
+.delete-btn.remove-btn:hover {
+    background: rgba(245, 158, 11, 1) !important;
+    border-color: rgba(245, 158, 11, 1) !important;
+    box-shadow: 0 8px 24px rgba(245, 158, 11, 0.5) !important;
 }
 
 .overlay-bottom {
