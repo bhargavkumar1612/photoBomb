@@ -116,7 +116,7 @@ photoBomb/
 - Cloud Run (FastAPI), Redis (Celery broker)
 - Cloudflare CDN configuration
 
-**CI/CD**: [.github/workflows/ci-cd.yml](.github/workflows/ci-cd.yml)
+**CI/CD**: [.github/workflows/deploy.yml](.github/workflows/deploy.yml) & [.github/workflows/deploy-frontend.yml](.github/workflows/deploy-frontend.yml)
 - Test → Build → Deploy pipeline
 - E2E tests post-deployment
 

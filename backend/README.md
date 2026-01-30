@@ -123,6 +123,6 @@ backend/
 ## Next Steps
 
 ✅ Backend foundation created
-🔄 Next: Upload API endpoints (presigned URLs)
-🔄 Next: Photos CRUD endpoints
-🔄 Next: Celery worker setup for thumbnail generation
+✅ Upload API endpoints (presigned URLs)
+✅ Photos CRUD endpoints
+✅ Celery worker setup for thumbnail generation

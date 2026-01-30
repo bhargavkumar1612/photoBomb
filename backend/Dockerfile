@@ -25,7 +25,7 @@ RUN chmod +x scripts/start_prod.sh
 USER appuser
 
 # Expose port
-EXPOSE 8000
+EXPOSE 10000
 
 # Default command
 CMD ["./scripts/start_prod.sh"]

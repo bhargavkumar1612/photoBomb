@@ -45,6 +45,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Delete Button**: Corrected positioning and styling of the delete button in the photo overlay.
 - **Shared Link Access**: Added error handling for viewer tracking to prevent shared link failures when database writes fail.
 - **Storage Provider Selection**: Fixed photo retrieval to use correct storage provider per photo for hybrid storage scenarios.
+- **Missing Thumbnails**: Fixed issue where face/animal crops were generated but not saved to storage. Created `regenerate_crops.py` to restore missing files.
+- **Render Deployment**: Fixed deployment timeout by correctly exposing port 10000 in Dockerfile to match Render's environment.
+- **Frontend Build**: Fixed `react-leaflet-cluster` peer dependency conflicts to ensure successful CI/CD builds.
+- **Backend Build Time**: Reduced build time by implementing a pre-baked base image (`bhargavkumar1612/photobomb-base:v1`) containing heavy ML dependencies.
+- **Database Migrations**: Refactored Alembic migrations to be idempotent and robust against re-runs.
+- **Security**: Added `Cross-Origin-Opener-Policy` (COOP) header to backend responses.
+- **Process Management**: Optimized Uvicorn worker count and added interaction checks to maintenance scripts.
 
 ## [0.1.0] - 2024-12-10
 ### Added

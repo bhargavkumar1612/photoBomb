@@ -64,6 +64,8 @@ class Photo(Base):
     albums = relationship("Album", secondary=f"{settings.DB_SCHEMA}.album_photos", back_populates="photos")
     files = relationship("PhotoFile", back_populates="photo", cascade="all, delete-orphan")
     visual_tags = relationship("Tag", secondary=f"{settings.DB_SCHEMA}.photo_tags", backref="photos_list", overlaps="photo_tags,tags,photo,tag")
+    faces = relationship("Face", back_populates="photo", cascade="all, delete-orphan")
+    animal_detections = relationship("AnimalDetection", back_populates="photo", cascade="all, delete-orphan")
     
     __table_args__ = (
         CheckConstraint(

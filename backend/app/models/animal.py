@@ -66,7 +66,7 @@ class AnimalDetection(Base):
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     
     # Relationships
-    photo = relationship("Photo", backref="animal_detections")
+    photo = relationship("Photo", back_populates="animal_detections")
     animal = relationship("Animal", back_populates="detections", foreign_keys=[animal_id])
     
     __table_args__ = (

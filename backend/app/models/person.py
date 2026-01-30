@@ -62,7 +62,7 @@ class Face(Base):
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     
     # Relationships
-    photo = relationship("Photo", backref="faces")
+    photo = relationship("Photo", back_populates="faces")
     person = relationship("Person", back_populates="faces", foreign_keys=[person_id])
     
     __table_args__ = (

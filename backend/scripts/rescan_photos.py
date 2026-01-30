@@ -182,6 +182,13 @@ async def process_photo(db, photo):
                                 location_left=left
                             )
                             db.add(new_face)
+                            await db.flush() # Get ID
+
+                            # Save facial crop
+                            from app.workers.thumbnail_worker import save_crop
+                            face_key = f"{settings.STORAGE_PATH_PREFIX}/{photo.user_id}/faces/{new_face.face_id}.jpg"
+                            save_crop(storage, tmp_path, (top, right, bottom, left), face_key, padding=0.4)
+
                         logger.info(f"Added {len(face_encodings)} face encodings.")
                     else:
                         logger.info("No faces found.")
