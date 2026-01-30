@@ -1,6 +1,6 @@
 # Use your custom pre-baked base image from Docker Hub
 # This contains python:3.11-slim + torch (cpu) + dlib + face_recognition + libvips
-FROM --platform=linux/amd64 bhargavkumar1612/photobomb-base:latest
+FROM bhargavkumar1612/photobomb-base:v1
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
