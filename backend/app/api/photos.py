@@ -193,6 +193,19 @@ async def list_photos(
     # Strict mode: We only show photos for the current provider, so we use that provider's service.
     storage = get_storage_service(settings.STORAGE_PROVIDER)
     
+    # Helper for safe float conversion
+    import math
+    def safe_float(val):
+        if val is None:
+            return None
+        try:
+            f = float(val)
+            if math.isnan(f) or math.isinf(f):
+                return None
+            return f
+        except (ValueError, TypeError):
+            return None
+
     for photo in photos:
         # storage = get_storage_service(photo.storage_provider) # Removed per strict isolation request
         
@@ -223,8 +236,8 @@ async def list_photos(
             caption=photo.caption,
             favorite=photo.favorite,
             archived=photo.archived,
-            gps_lat=float(photo.gps_lat) if photo.gps_lat else None,
-            gps_lng=float(photo.gps_lng) if photo.gps_lng else None,
+            gps_lat=safe_float(photo.gps_lat),
+            gps_lng=safe_float(photo.gps_lng),
             location_name=photo.location_name,
             thumb_urls=thumb_urls,
             tags=[t.name for t in photo.visual_tags] if hasattr(photo, 'visual_tags') else []
@@ -264,6 +277,16 @@ async def get_map_photos(
     
     storage = get_storage_service(settings.STORAGE_PROVIDER)
     photo_responses = []
+
+    # Local helper for map too (or move to util if used more widely)
+    import math
+    def safe_float(val):
+        if val is None: return None
+        try:
+            f = float(val)
+            if math.isnan(f) or math.isinf(f): return None
+            return f
+        except: return None
     
     for photo in photos:
         key_base = f"{settings.STORAGE_PATH_PREFIX}/{current_user.user_id}/{photo.photo_id}"
@@ -283,8 +306,8 @@ async def get_map_photos(
             caption=photo.caption,
             favorite=photo.favorite,
             archived=photo.archived,
-            gps_lat=float(photo.gps_lat) if photo.gps_lat else None,
-            gps_lng=float(photo.gps_lng) if photo.gps_lng else None,
+            gps_lat=safe_float(photo.gps_lat),
+            gps_lng=safe_float(photo.gps_lng),
             location_name=photo.location_name,
             thumb_urls=thumb_urls
         ))
@@ -326,6 +349,16 @@ async def get_photo(
         "original": storage.generate_presigned_url(f"{key_base}/original/{photo.filename}", expires_in=3600)
     }
     
+    # Safe float helper
+    import math
+    def safe_float(val):
+        if val is None: return None
+        try:
+            f = float(val)
+            if math.isnan(f) or math.isinf(f): return None
+            return f
+        except: return None
+
     return PhotoResponse(
         photo_id=str(photo.photo_id),
         filename=photo.filename,
@@ -336,6 +369,9 @@ async def get_photo(
         caption=photo.caption,
         favorite=photo.favorite,
         archived=photo.archived,
+        gps_lat=safe_float(photo.gps_lat),
+        gps_lng=safe_float(photo.gps_lng),
+        location_name=photo.location_name,
         thumb_urls=thumb_urls,
         tags=[t.name for t in photo.visual_tags] if hasattr(photo, 'visual_tags') else []
     )
@@ -698,4 +734,45 @@ async def batch_permanent_delete(
     )
     
     await db.commit()
+    await db.commit()
     return None
+
+
+@router.post("/rescan", status_code=status.HTTP_202_ACCEPTED)
+async def rescan_photos(
+    process_all: bool = False,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Trigger background processing (Rescan) for photos.
+    If process_all is True, rescans ALL photos.
+    If False, rescans photos that might be missing metadata (processed_at is None).
+    """
+    from app.celery_app import celery_app
+    
+    query = select(Photo).where(
+        Photo.user_id == current_user.user_id,
+        Photo.deleted_at == None
+    )
+    
+    if not process_all:
+        # Only unprocessed
+        query = query.where(Photo.processed_at == None)
+        
+    result = await db.execute(query)
+    photos = result.scalars().all()
+    
+    count = 0
+    for photo in photos:
+        # We pass upload_id=photo_id to indicate the file is already in its final location
+        celery_app.send_task(
+            'app.workers.thumbnail_worker.process_upload',
+            args=[str(photo.photo_id), str(photo.photo_id)]
+        )
+        count += 1
+        
+    return {
+        "message": f"Triggered rescan for {count} photos.",
+        "count": count
+    }

@@ -36,13 +36,41 @@ class PersonUpdate(BaseModel):
 @router.post("/cluster")
 async def trigger_clustering(
     background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
 ):
     """
-    Trigger background face clustering for the current user.
+    Trigger full library analysis (Scan) and then Clustering.
+    1. Queues 'process_upload' for any unprocessed photos (Faces, Objects, Animals, Text).
+    2. Queues 'cluster_faces' to group detected faces.
     """
+    from app.celery_app import celery_app
+    
+    # 1. Triger Rescan for unprocessed photos
+    result = await db.execute(
+        select(Photo).where(
+            Photo.user_id == current_user.user_id,
+            Photo.deleted_at == None,
+            Photo.processed_at == None
+        )
+    )
+    photos = result.scalars().all()
+    
+    scanned_count = 0
+    for photo in photos:
+        celery_app.send_task(
+            'app.workers.thumbnail_worker.process_upload',
+            args=[str(photo.photo_id), str(photo.photo_id)]
+        )
+        scanned_count += 1
+    
+    # 2. Trigger Clustering
     background_tasks.add_task(cluster_faces, current_user.user_id)
-    return {"message": "Clustering started in background"}
+    
+    return {
+        "message": f"Analysis started: Scanning {scanned_count} new photos. Face clustering running in background.",
+        "scanned_count": scanned_count
+    }
 
 from sqlalchemy.orm import selectinload
 
@@ -175,6 +203,16 @@ async def list_person_photos(
     from app.core.config import settings
     storage = get_storage_service(settings.STORAGE_PROVIDER)
 
+    # Safe float helper
+    import math
+    def safe_float(val):
+        if val is None: return None
+        try:
+            f = float(val)
+            if math.isnan(f) or math.isinf(f): return None
+            return f
+        except: return None
+
     for photo in photos:
         key_base = f"{settings.STORAGE_PATH_PREFIX}/{current_user.user_id}/{photo.photo_id}"
         
@@ -195,8 +233,8 @@ async def list_person_photos(
             caption=photo.caption,
             favorite=photo.favorite,
             archived=photo.archived,
-            gps_lat=float(photo.gps_lat) if photo.gps_lat else None,
-            gps_lng=float(photo.gps_lng) if photo.gps_lng else None,
+            gps_lat=safe_float(photo.gps_lat),
+            gps_lng=safe_float(photo.gps_lng),
             location_name=photo.location_name,
             thumb_urls=thumb_urls
         ))

@@ -35,8 +35,9 @@ async def cluster_faces(user_id: uuid.UUID):
         # DBSCAN parameters: 
         # eps: max distance between two samples for one to be considered as in the neighborhood of the other.
         #      0.6 is a common threshold for dlib face encodings. Lower = stricter.
-        # min_samples: The number of samples (or total weight) in a neighborhood for a point to be considered as a core point.
-        clt = DBSCAN(eps=0.5, min_samples=3, metric="euclidean")
+        # min_samples=1 means every face will at least start its own cluster if not close to others.
+        # This ensures we don't "lose" faces as noise.
+        clt = DBSCAN(eps=0.5, min_samples=1, metric="euclidean")
         clt.fit(encodings)
 
         # Labels will be e.g., [0, 1, 0, -1, 1] where -1 is noise (unknown/outlier)

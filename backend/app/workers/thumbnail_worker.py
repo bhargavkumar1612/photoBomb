@@ -127,7 +127,12 @@ def _generate_thumbnail_vips(input_path, output_path, size, format) -> Tuple[int
 def _generate_thumbnail_pil(input_path, output_path, size, format) -> Tuple[int, int]:
     with Image.open(input_path) as img:
         # Auto-rotate
-        img = ImageOps.exif_transpose(img)
+        try:
+            img = ImageOps.exif_transpose(img)
+        except (Exception, ZeroDivisionError, TypeError) as e:
+            print(f"Warning: Failed to auto-rotate image {input_path} due to corrupt EXIF: {e}")
+            # Continue with original image
+            pass
         
         # Calculate new size maintaining aspect ratio
         img.thumbnail((size, size), Image.Resampling.LANCZOS)
@@ -233,19 +238,34 @@ def process_upload(self, upload_id: str, photo_id: str):
                 source_key = f"{settings.STORAGE_PATH_PREFIX}/{photo.user_id}/{upload_id}/original/{photo.filename}"
                 dest_key = f"{settings.STORAGE_PATH_PREFIX}/{photo.user_id}/{photo.photo_id}/original/{photo.filename}"
                 
-                # Download
-                print(f"Downloading from {source_key}")
-                original_bytes = storage.download_file_bytes(source_key)
-                
+                try:
+                    # Download
+                    print(f"Downloading from {source_key}")
+                    try:
+                        original_bytes = storage.download_file_bytes(source_key)
+                    except Exception as e:
+                        print(f"Source key {source_key} failed: {e}. Trying destination {dest_key}...")
+                        original_bytes = storage.download_file_bytes(dest_key)
+                        # If successful, no need to re-upload/move
+                        upload_id = str(photo.photo_id) 
+
+                except Exception as e:
+                    print(f"Critical: Could not find original file for photo {photo_id}: {e}")
+                    # Mark as error? For now just return to avoid crash loop
+                    return
+
                 # If we moved it effectively by downloading, we should re-upload to key expected by API if they differ
                 if upload_id != str(photo.photo_id):
                     print(f"Moving to {dest_key}")
-                    storage.upload_bytes(
-                        data_bytes=original_bytes,
-                        key=dest_key,
-                        content_type=photo.mime_type
-                    )
-                    # Ideally delete the old one
+                    try:
+                         storage.upload_bytes(
+                            data_bytes=original_bytes,
+                            key=dest_key,
+                            content_type=photo.mime_type
+                        )
+                    except Exception as e:
+                        print(f"Failed to copy to dest: {e}")
+                        pass # Continue if we have the bytes
                 
                 # 3. Generate Thumbnails
                 # Save temp file
@@ -546,6 +566,58 @@ def process_upload(self, upload_id: str, photo_id: str):
                         if not link_res.scalar_one_or_none():
                             pt = PhotoTag(photo_id=photo.photo_id, tag_id=tag_id, confidence=score)
                             db.add(pt)
+
+                # 4f. Text Detection (OCR)
+                try:
+                    import pytesseract
+                    print(f"Running OCR on {photo.filename}...")
+                    text = pytesseract.image_to_string(tmp_path)
+                    # Simple tokenization: splits by whitespace, keeps alphanumeric > 3 chars
+                    words = set(w.lower() for w in text.split() if len(w) > 3 and w.isalnum())
+                    
+                    if words:
+                        print(f"Found text: {list(words)[:10]}...")
+                        
+                    for word in words:
+                        # Check/Create tag
+                        tag_name = word
+                        
+                        # Optimization: Check if tag exists (cache this lookup?)
+                        stmt = await db.execute(select(Tag).where(Tag.name == tag_name))
+                        existing_tag = stmt.scalar_one_or_none()
+                        
+                        tag_id = None
+                        if not existing_tag:
+                            try:
+                                new_tag = Tag(name=tag_name, category="text")
+                                db.add(new_tag)
+                                await db.flush()
+                                tag_id = new_tag.tag_id
+                            except Exception:
+                                await db.rollback()
+                                stmt = await db.execute(select(Tag).where(Tag.name == tag_name))
+                                existing_tag = stmt.scalar_one()
+                                tag_id = existing_tag.tag_id
+                        else:
+                            tag_id = existing_tag.tag_id
+                            if not existing_tag.category: # Don't overwrite if it was "general" or "documents"
+                                existing_tag.category = "text"
+                                db.add(existing_tag)
+
+                        # Link
+                        link_res = await db.execute(select(PhotoTag).where(
+                            PhotoTag.photo_id == photo.photo_id,
+                            PhotoTag.tag_id == tag_id
+                        ))
+                        if not link_res.scalar_one_or_none():
+                            pt = PhotoTag(photo_id=photo.photo_id, tag_id=tag_id, confidence=1.0) # 1.0 confidence for OCR
+                            db.add(pt)
+                            
+                except ImportError:
+                    print("pytesseract not installed")
+                except Exception as e:
+                     # e.g. Tesseract binary not found
+                    print(f"OCR warning: {e}")
 
                 print(f"Classification complete.")
 

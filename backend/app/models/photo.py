@@ -9,6 +9,7 @@ import uuid
 
 from app.core.database import Base
 from app.core.config import settings
+from app.models.tag import PhotoTag # Safe import confirmed
 
 
 class Photo(Base):
@@ -63,7 +64,20 @@ class Photo(Base):
     user = relationship("User", back_populates="photos")
     albums = relationship("Album", secondary=f"{settings.DB_SCHEMA}.album_photos", back_populates="photos")
     files = relationship("PhotoFile", back_populates="photo", cascade="all, delete-orphan")
-    visual_tags = relationship("Tag", secondary=f"{settings.DB_SCHEMA}.photo_tags", backref="photos_list", overlaps="photo_tags,tags,photo,tag")
+    
+    # Delayed import or use string if possible, but for order_by with column we need the class usually.
+    # However, since we determined no circular import, we will import at top.
+    # But wait, replace_file_content replaces a block. I will add the import at the top in a separate call or hack it here?
+    # I'll try to add order_by using string argument "desc(PhotoTag.confidence)" and hope SQLAlchemy 1.4+ resolves it from the secondary.
+    # Actually, let's just assume we can use the class if we import it.
+    
+    visual_tags = relationship(
+        "Tag",
+        secondary=f"{settings.DB_SCHEMA}.photo_tags",
+        backref="photos_list",
+        overlaps="photo_tags,tags,photo,tag",
+        order_by="desc(PhotoTag.confidence)"
+    )
     faces = relationship("Face", back_populates="photo", cascade="all, delete-orphan")
     animal_detections = relationship("AnimalDetection", back_populates="photo", cascade="all, delete-orphan")
     

@@ -23,9 +23,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Secure Image Serving**: Implemented Ahead-Of-Time (AOT) Presigned URLs to serve all images securely without JWTs in URLs.
 - **Share Modal Improvements**: Enhanced UI with tabbed interface separating "Public Links" and "Viewers", displaying aggregated viewer list across all share links.
 - **Keyboard Accessibility**: Full keyboard navigation support across the application. Implemented global focus rings, `Escape` to close modals, `Enter` to confirm actions, and focusable photo grid items.
-- **Sharing Inbox Redesign**: Overhauled the Sharing Inbox with a modern grid layout for shared albums, drilling down into sender-specific views, and consistent date-grouped masonry layouts for shared photos.
+- **Direct Photo Sharing**: Implemented end-to-end photo sharing via email, including "Inbox" and "Connections" tabs, secure invite links for non-users, and claim functionality upon registration.
+- **Animal Detection Parity**: Fully implemented Animal detection with dedicated API endpoints, filtering, and UI (feature parity with People).
 
 ### Changed
+- **Hashtag UI**: refined Hashtag Detail view to hide raw UUIDs, displaying a fallback title if the tag name is unresolvable, and sorting tags by confidence score.
+
+### Fixed
+- **Broken Thumbnails**: Fixed "NoSuchKey" errors in `rescan_photos.py` and successfully repaired 65+ broken thumbnails/orphaned files.
+- **Hashtag Display**: Resolved "0 Photos" bug for certain hashtags by enabling UUID-based lookup in frontend routing.
+- **OCR Tagging**: Restored Tesseract OCR functionality, enabling text extraction for documents (e.g., #invoice, #receipt).
 - **Gallery UI Overhaul**: Complete redesign of the photo timeline with premium glassmorphism aesthetics, contextual selection headers, and refined spacing.
 - **View Settings**: Consolidated grid density (Compact/Comfortable/Large) and date grouping (Day/Month/Year) controls into a unified Jira-style dropdown menu.
 - **Hashtag Display**: Updated hashtag visibility logic to remain hidden by default and fade in smoothly on hover to reduce visual clutter.

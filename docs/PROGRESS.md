@@ -28,6 +28,7 @@ A production-ready photo service (PWA) with full planning documentation and work
 - **Face Recognition** (Detection, clustering, People gallery)
 - **Object & Scene Detection** (CLIP AI, automatic tagging)
 - **Advanced Sharing** (Share links, viewer tracking, contributor management)
+- **Direct Photo Sharing** (Inbox, Connections, Email Sharing, Secure Invites)
 - **Hybrid Storage** (B2, S3, R2 support with per-photo provider tracking)
 - **Visual Hashtags** (Unified object/scene detection with optimized batch fetching)
 - **Maintainability** (Database keep-alive heartbeat via Celery)

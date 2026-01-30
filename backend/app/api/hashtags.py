@@ -39,7 +39,7 @@ async def list_hashtags(
         .join(PhotoTag, PhotoTag.tag_id == Tag.tag_id)
         .join(Photo, Photo.photo_id == PhotoTag.photo_id)
         .where(
-            Tag.category.in_(["documents", "animals", "places", "place", "nature", "people"]),
+            Tag.category.in_(["documents", "animals", "places", "place", "nature", "people", "text", "general"]),
             Photo.user_id == current_user.user_id,
             Photo.deleted_at == None
         )
@@ -86,7 +86,9 @@ async def list_hashtags(
         
     return response
 
-@router.get("/{tag_id}/photos")
+from app.api.photos import PhotoResponse
+
+@router.get("/{tag_id}/photos", response_model=List[PhotoResponse])
 async def list_hashtag_photos(
     tag_id: uuid.UUID,
     limit: int = 100,
@@ -95,8 +97,13 @@ async def list_hashtag_photos(
     db: AsyncSession = Depends(get_db)
 ):
     """List all photos for a specific document tag."""
+    # Need to include visual_tags for the response logic
+    from app.models.photo import Photo
+    from sqlalchemy.orm import selectinload
+    
     stmt = (
         select(Photo)
+        .options(selectinload(Photo.visual_tags))
         .join(PhotoTag, PhotoTag.photo_id == Photo.photo_id)
         .where(
             PhotoTag.tag_id == tag_id,
@@ -113,6 +120,16 @@ async def list_hashtag_photos(
     
     response = []
     storage = get_storage_service(settings.STORAGE_PROVIDER)
+    
+    # Safe float helper
+    import math
+    def safe_float(val):
+        if val is None: return None
+        try:
+            f = float(val)
+            if math.isnan(f) or math.isinf(f): return None
+            return f
+        except: return None
 
     for photo in photos:
         key_base = f"{settings.STORAGE_PATH_PREFIX}/{current_user.user_id}/{photo.photo_id}"
@@ -123,11 +140,21 @@ async def list_hashtag_photos(
             "original": storage.generate_presigned_url(f"{key_base}/original/{photo.filename}", expires_in=3600)
         }
         
-        response.append({
-            "photo_id": str(photo.photo_id),
-            "filename": photo.filename,
-            "thumb_urls": thumb_urls,
-            "taken_at": photo.taken_at
-        })
+        response.append(PhotoResponse(
+            photo_id=str(photo.photo_id),
+            filename=photo.filename,
+            mime_type=photo.mime_type,
+            size_bytes=photo.size_bytes,
+            taken_at=photo.taken_at,
+            uploaded_at=photo.uploaded_at,
+            caption=photo.caption,
+            favorite=photo.favorite,
+            archived=photo.archived,
+            gps_lat=safe_float(photo.gps_lat),
+            gps_lng=safe_float(photo.gps_lng),
+            location_name=photo.location_name,
+            thumb_urls=thumb_urls,
+            tags=[t.name for t in photo.visual_tags] if hasattr(photo, 'visual_tags') else []
+        ))
         
     return response

@@ -21,21 +21,41 @@ const HashtagDetailPage = () => {
 
     const fetchTagPhotos = async () => {
         try {
-            // First, get all hashtags to find the one with matching name
+            // First, get all hashtags to resolve the Name from the ID (or vice versa)
             const tagsRes = await api.get("/hashtags");
-            const currentTag = tagsRes.data.find(t => t.name === tagId);
 
-            if (!currentTag) {
-                console.error("Tag not found");
-                setLoading(false);
-                return;
+            // Try to find the tag in the list
+            const currentTag = tagsRes.data.find(t => t.name === tagId || t.tag_id === tagId);
+
+            let fetchId = tagId;
+            let displayName = "Hashtag";
+
+            if (currentTag) {
+                // We found it! Use the correct Name and ID
+                displayName = currentTag.name;
+                fetchId = currentTag.tag_id;
+            } else {
+                // Not in the list (maybe new, or strictly searching by ID not in list?)
+                // If tagId looks like a UUID, we use it directly to fetch photos.
+                console.warn(`Tag ${tagId} not found in global list. Attempting direct fetch.`);
+                displayName = "Hashtag"; // Fallback generic name. Do NOT show UUID.
             }
 
-            setTagName(currentTag.name);
+            setTagName(displayName);
 
-            // Now fetch photos using the tag's UUID
-            const response = await api.get(`/hashtags/${currentTag.tag_id}/photos`);
+            // Now fetch photos
+            const response = await api.get(`/hashtags/${fetchId}/photos`);
             setPhotos(response.data);
+
+            // If we have photos, we might be able to find the name if we had a better matching strategy.
+            // But since we can't be sure, staying safe with "Hashtag" is better than showing a UUID.
+            // Future improvement: Add GET /hashtags/:id endpoint to backend.
+            if (!currentTag && response.data.length > 0) {
+                // Try to guess? No, unsafe. 
+                // User explicitly asked "dont show uuids".
+                // So we keep "Hashtag".
+            }
+
         } catch (error) {
             console.error("Failed to fetch hashtag photos", error);
         } finally {

@@ -159,6 +159,32 @@ async def view_shared_album(
     
     # Get Album details
     album = share.album
+
+    # Auto-join logic: If user is logged in, and not owner, and not already a contributor, add as viewer.
+    if current_user and album.user_id != current_user.user_id:
+        from app.models.album import album_contributors
+        # Check if already a contributor
+        check_contrib = await db.execute(
+            select(album_contributors.c.user_id).where(
+                album_contributors.c.album_id == album.album_id,
+                album_contributors.c.user_id == current_user.user_id
+            )
+        )
+        if not check_contrib.scalar_one_or_none():
+            # Add as viewer
+            try:
+                stmt = album_contributors.insert().values(
+                    album_id=album.album_id,
+                    user_id=current_user.user_id,
+                    role='viewer',
+                    joined_at=datetime.utcnow()
+                )
+                await db.execute(stmt)
+                await db.commit()
+            except Exception as e:
+                print(f"Failed to auto-join album: {e}")
+                # Don't block viewing if join fails
+                await db.rollback()
     
     # Get Album Owner details
     result_owner = await db.execute(select(User).where(User.user_id == album.user_id))
