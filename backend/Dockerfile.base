@@ -1,11 +1,11 @@
-# Using 2.5.1 for better registry reliability
-FROM pytorch/pytorch:2.5.1-runtime
+# Use a standard, stable Python base
+FROM python:3.11-slim
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# Install system dependencies
+# Install system dependencies for dlib, torch, and vips
 RUN apt-get update && apt-get install -y \
     build-essential \
     cmake \
@@ -13,14 +13,17 @@ RUN apt-get update && apt-get install -y \
     libvips-dev \
     libopenblas-dev \
     liblapack-dev \
-    python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install your heavy-lifting ML libs
-# We specify +cpu to keep the image from ballooning
+# Install the heavy hitters directly
+# We point to the official CPU-only index to keep things lean
+RUN pip install --no-cache-dir \
+    torch==2.2.1 torchvision==0.17.1 \
+    --index-url https://download.pytorch.org/whl/cpu
+
 RUN pip install --no-cache-dir \
     numpy==1.26.4 \
     scikit-learn \
     face_recognition==1.3.0 \
     transformers \
-    --extra-index-url https://download.pytorch.org/whl/cpu
+    pyvips

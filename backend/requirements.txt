@@ -31,7 +31,7 @@ aioboto3==13.0.0
 
 # --- Image Processing ---
 # Note: Requires libvips-dev installed in Docker
-pyvips==2.2.1
+# pyvips moved to base image
 imagehash==4.3.1
 timm
 pillow-avif-plugin
