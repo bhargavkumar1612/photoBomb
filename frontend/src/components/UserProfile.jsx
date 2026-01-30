@@ -21,7 +21,12 @@ export default function UserProfile() {
     }, []);
 
     const getInitials = (name) => {
-        return name ? name.charAt(0).toUpperCase() : 'U';
+        if (!name) return 'U';
+        const parts = name.trim().split(' ');
+        if (parts.length >= 2) {
+            return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase();
+        }
+        return name.charAt(0).toUpperCase();
     };
 
     return (
@@ -29,13 +34,13 @@ export default function UserProfile() {
             <button
                 className="profile-trigger"
                 onClick={() => setIsOpen(!isOpen)}
-                title={user?.name || 'User Profile'}
+                title={user?.full_name || 'User Profile'}
             >
                 {user?.picture ? (
                     <img src={user.picture} alt="Profile" className="profile-avatar" />
                 ) : (
                     <div className="profile-initials">
-                        {getInitials(user?.name)}
+                        {getInitials(user?.full_name)}
                     </div>
                 )}
             </button>
@@ -44,7 +49,7 @@ export default function UserProfile() {
                 <div className="profile-dropdown">
                     <div className="dropdown-header">
                         <div className="user-info">
-                            <span className="user-name">{user?.name}</span>
+                            <span className="user-name">{user?.full_name}</span>
                             <span className="user-email">{user?.email}</span>
                         </div>
                     </div>
