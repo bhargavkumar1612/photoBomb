@@ -11,23 +11,29 @@ from app.services.face_clustering import cluster_faces
 from sqlalchemy import select
 from app.models.user import User
 
+from app.core.config import settings
+
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+print(f"\\n{'='*50}")
+print(f"CONFIGURATION CHECK:")
+print(f"DB_SCHEMA:        {settings.DB_SCHEMA}")
+print(f"{'='*50}\\n")
+
 async def main():
     async with AsyncSessionLocal() as db:
-        # Get the first user (assuming single user for now or just pick one)
+        # Run for ALL users
         result = await db.execute(select(User))
-        user = result.scalars().first()
+        users = result.scalars().all()
         
-        if not user:
-            logger.error("No user found in DB")
-            return
-            
-        logger.info(f"Running clustering for user {user.email} ({user.user_id})")
-        
-        await cluster_faces(user.user_id)
+        logger.info(f"Found {len(users)} users to cluster faces for.")
+
+        for user in users:
+            logger.info(f"--------------------------------------------------")
+            logger.info(f"Running clustering for user {user.email} ({user.user_id})")
+            await cluster_faces(user.user_id)
         
     logger.info("Done.")
 

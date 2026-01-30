@@ -21,6 +21,16 @@ from app.services.storage_factory import get_storage_service
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+print(f"\\n{'='*50}")
+print(f"CONFIGURATION CHECK:")
+print(f"DB_SCHEMA:        {settings.DB_SCHEMA}")
+print(f"STORAGE_PROVIDER: {settings.STORAGE_PROVIDER}")
+if settings.STORAGE_PROVIDER == 's3':
+    print(f"BUCKET_NAME:      {settings.S3_BUCKET_NAME}")
+else:
+    print(f"BUCKET_NAME:      {settings.B2_BUCKET_NAME}")
+print(f"{'='*50}\\n")
+
 # Try importing face_recognition
 try:
     import face_recognition

@@ -23,6 +23,16 @@ from app.workers.thumbnail_worker import save_crop
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+print(f"\\n{'='*50}")
+print(f"CONFIGURATION CHECK:")
+print(f"DB_SCHEMA:        {settings.DB_SCHEMA}")
+print(f"STORAGE_PROVIDER: {settings.STORAGE_PROVIDER}")
+if settings.STORAGE_PROVIDER == 's3':
+    print(f"BUCKET_NAME:      {settings.S3_BUCKET_NAME}")
+else:
+    print(f"BUCKET_NAME:      {settings.B2_BUCKET_NAME}")
+print(f"{'='*50}\\n")
+
 async def process_photo_for_animals(db, photo, storage):
     logger.info(f"Processing photo {photo.photo_id} ({photo.filename}) for animals")
     
