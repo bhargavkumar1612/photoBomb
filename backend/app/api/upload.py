@@ -161,8 +161,8 @@ async def confirm_upload(
     await db.commit()
     await db.refresh(photo)
     
-    # Enqueue Celery job for processing
-    celery_app.send_task('app.workers.thumbnail_worker.process_upload', args=[request.upload_id, str(photo.photo_id)])
+    # Enqueue Celery    # Trigger processing task (initial only)
+    celery_app.send_task('app.workers.thumbnail_worker.process_photo_initial', args=[request.upload_id, str(photo.photo_id)])
     
     return ConfirmResponse(
         photo_id=str(photo.photo_id),
@@ -310,7 +310,7 @@ async def direct_upload(
         # Enqueue Celery job for processing (thumbnails, metadata, AI)
         from app.celery_app import celery_app
         # We pass photo_id as upload_id because direct upload stores file at photo_id path
-        celery_app.send_task('app.workers.thumbnail_worker.process_upload', args=[str(photo.photo_id), str(photo.photo_id)])
+        celery_app.send_task('app.workers.thumbnail_worker.process_photo_initial', args=[str(photo.photo_id), str(photo.photo_id)])
 
         return ConfirmResponse(
             photo_id=str(photo.photo_id),

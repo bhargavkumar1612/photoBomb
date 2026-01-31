@@ -767,7 +767,7 @@ async def rescan_photos(
     for photo in photos:
         # We pass upload_id=photo_id to indicate the file is already in its final location
         celery_app.send_task(
-            'app.workers.thumbnail_worker.process_upload',
+            'app.workers.thumbnail_worker.process_photo_initial',
             args=[str(photo.photo_id), str(photo.photo_id)]
         )
         count += 1

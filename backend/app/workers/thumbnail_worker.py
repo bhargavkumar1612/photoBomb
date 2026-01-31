@@ -212,9 +212,10 @@ class CallbackTask(Task):
 
 
 @celery_app.task(bind=True, base=CallbackTask, max_retries=3)
-def process_upload(self, upload_id: str, photo_id: str):
+def process_photo_initial(self, upload_id: str, photo_id: str):
     """
-    Process uploaded photo: generate thumbnails, computed hashes, extract EXIF.
+    Step 1: Process uploaded photo: generate thumbnails, computed hashes, extract EXIF.
+    Then triggers Step 2: process_photo_analysis.
     """
     async def _process():
         async with AsyncSessionLocal() as db:
@@ -372,7 +373,110 @@ def process_upload(self, upload_id: str, photo_id: str):
                     except Exception as e:
                         print(f"Error parsing GPS: {e}")
 
-                # 4c. Face Recognition
+                # Update DB with initial metadata
+                photo.size_bytes = size_bytes
+                photo.sha256 = sha256
+                # Ensure phash is stored as signed 64-bit integer for Postgres BIGINT
+                if phash >= 2**63:
+                    phash -= 2**64
+                photo.phash = phash
+                
+                # Filename Fallback (if no EXIF date)
+                if not photo.taken_at:
+                    import re
+                    wa_pattern = re.search(r"(\d{4}-\d{2}-\d{2}) at (\d{2}\.\d{2}\.\d{2})", photo.filename)
+                    if wa_pattern:
+                        try:
+                            date_str = wa_pattern.group(1)
+                            time_str = wa_pattern.group(2).replace('.', ':')
+                            photo.taken_at = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M:%S")
+                        except ValueError:
+                            pass
+                    
+                    if not photo.taken_at:
+                        compact_pattern = re.search(r"(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})", photo.filename)
+                        if compact_pattern:
+                            try:
+                                if 2000 <= int(compact_pattern.group(1)) <= 2099:
+                                    photo.taken_at = datetime(
+                                        int(compact_pattern.group(1)),
+                                        int(compact_pattern.group(2)),
+                                        int(compact_pattern.group(3)),
+                                        int(compact_pattern.group(4)),
+                                        int(compact_pattern.group(5)),
+                                        int(compact_pattern.group(6))
+                                    )
+                            except ValueError:
+                                pass
+
+                photo.processed_at = datetime.utcnow() # Mark as initially processed so UI shows it
+                
+                await db.commit()
+                
+                os.unlink(tmp_path)
+                print(f"Successfully finished initial processing for {photo_id}")
+                
+                # Trigger Analysis Task
+                celery_app.send_task('app.workers.thumbnail_worker.process_photo_analysis', args=[upload_id, photo_id])
+
+            except Exception as e:
+                print(f"Error processing photo {photo_id}: {e}")
+                # Clean up temp file if exists and we failed
+                if 'tmp_path' in locals() and os.path.exists(tmp_path):
+                     os.unlink(tmp_path)
+                raise e
+
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+    return loop.run_until_complete(_process())
+
+
+@celery_app.task(bind=True, base=CallbackTask, max_retries=2)
+def process_photo_analysis(self, upload_id: str, photo_id: str):
+    """
+    Step 2: AI Analysis (Face, Objects, Animals, Text).
+    Runs separately to avoid OOM.
+    """
+    async def _analyze():
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(select(Photo).where(Photo.photo_id == photo_id))
+            photo = result.scalar_one_or_none()
+            
+            if not photo:
+                print(f"Photo {photo_id} not found for analysis")
+                return
+
+            # Download again for analysis (clean slate for memory)
+            # This seems inefficient but is safer for memory than passing the bytes in memory or keeping file open
+            # Ideally we use the temp file if on same worker, but Celery workers might differ.
+            # We will download to temp again.
+            
+            tmp_path = None
+            try:
+                from app.services.storage_factory import get_storage_service
+                storage = get_storage_service(photo.storage_provider)
+                
+                # Determine key (it should be at dest_key now)
+                dest_key = f"{settings.STORAGE_PATH_PREFIX}/{photo.user_id}/{photo.photo_id}/original/{photo.filename}"
+                
+                try:
+                    # Download
+                    original_bytes = storage.download_file_bytes(dest_key)
+                except Exception as e:
+                     print(f"Analysis: Could not download {dest_key}: {e}")
+                     return
+
+                with tempfile.NamedTemporaryFile(delete=False) as tmp:
+                    tmp.write(original_bytes)
+                    tmp_path = tmp.name
+
+                # Free up bytes memory
+                del original_bytes
+
                 # 4c. Face Recognition
                 try:
                     face_recognition = get_face_recognition()
@@ -624,63 +728,24 @@ def process_upload(self, upload_id: str, photo_id: str):
                     print(f"OCR warning: {e}")
 
                 print(f"Classification complete.")
-
-                # 4b. Filename Fallback (if no EXIF date)
-                if not photo.taken_at:
-                    # ... (keep existing filename logic)
-                    import re
-                    # ... (rest of filename logic)
-                    wa_pattern = re.search(r"(\d{4}-\d{2}-\d{2}) at (\d{2}\.\d{2}\.\d{2})", photo.filename)
-                    if wa_pattern:
-                        try:
-                            date_str = wa_pattern.group(1)
-                            time_str = wa_pattern.group(2).replace('.', ':')
-                            photo.taken_at = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M:%S")
-                        except ValueError:
-                            pass
-                    
-                    if not photo.taken_at:
-                        compact_pattern = re.search(r"(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})", photo.filename)
-                        if compact_pattern:
-                            try:
-                                if 2000 <= int(compact_pattern.group(1)) <= 2099:
-                                    photo.taken_at = datetime(
-                                        int(compact_pattern.group(1)),
-                                        int(compact_pattern.group(2)),
-                                        int(compact_pattern.group(3)),
-                                        int(compact_pattern.group(4)),
-                                        int(compact_pattern.group(5)),
-                                        int(compact_pattern.group(6))
-                                    )
-                            except ValueError:
-                                pass
-
-                # Update DB
-                photo.size_bytes = size_bytes
-                photo.sha256 = sha256
-                # Ensure phash is stored as signed 64-bit integer for Postgres BIGINT
-                if phash >= 2**63:
-                    phash -= 2**64
-                photo.phash = phash
-                
-                photo.processed_at = datetime.utcnow()
-                
-                await db.commit()
-                
-                os.unlink(tmp_path)
-                print(f"Successfully processed photo {photo_id}")
+                print(f"Analysis/Classification complete for {photo.filename}")
                 
             except Exception as e:
-                print(f"Error processing photo {photo_id}: {e}")
+                print(f"Error analyzing photo {photo_id}: {e}")
                 raise e
-
+            finally:
+                if tmp_path and os.path.exists(tmp_path):
+                    os.unlink(tmp_path)
+    
     try:
         loop = asyncio.get_event_loop()
     except RuntimeError:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         
-    return loop.run_until_complete(_process())
+    return loop.run_until_complete(_analyze())
+
+
 
 
 def compute_perceptual_hash(image_path: str) -> int:
