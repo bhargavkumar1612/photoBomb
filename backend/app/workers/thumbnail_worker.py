@@ -24,6 +24,7 @@ import tempfile
 from datetime import datetime
 from app.core.config import settings
 import asyncio
+import gc # Added gc import
 from sqlalchemy import select
 from app.models.photo import Photo
 from app.core.database import AsyncSessionLocal
@@ -421,9 +422,13 @@ def process_photo_initial(self, upload_id: str, photo_id: str):
 
             except Exception as e:
                 print(f"Error processing photo {photo_id}: {e}")
-                # Clean up temp file if exists and we failed
-                if 'tmp_path' in locals() and os.path.exists(tmp_path):
-                     os.unlink(tmp_path)
+                # Log error in DB?
+            finally:
+                if 'tmp_path' in locals() and tmp_path and os.path.exists(tmp_path):
+                    os.unlink(tmp_path)
+                # Force release of memory
+                import gc
+                gc.collect()
                 raise e
 
     try:

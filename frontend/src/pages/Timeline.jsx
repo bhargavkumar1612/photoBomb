@@ -186,7 +186,7 @@ export default function Timeline({ favoritesOnly = false }) {
         default: gridSize === 'compact' ? 5 : gridSize === 'comfortable' ? 4 : 3,
         1400: gridSize === 'compact' ? 4 : gridSize === 'comfortable' ? 3 : 2,
         900: gridSize === 'compact' ? 3 : 2,
-        600: 2
+        600: gridSize === 'compact' ? 3 : gridSize === 'comfortable' ? 2 : 1
     }
 
     const basePhotos = useMemo(() => {
