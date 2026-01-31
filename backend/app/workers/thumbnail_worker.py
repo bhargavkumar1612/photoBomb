@@ -757,6 +757,9 @@ def process_photo_analysis(self, upload_id: str, photo_id: str):
 
 
 
+# Legacy Task Alias (for draining old queue messages)
+process_upload = process_photo_initial
+
 def compute_perceptual_hash(image_path: str) -> int:
     """
     Compute perceptual hash (pHash) for duplicate detection.
