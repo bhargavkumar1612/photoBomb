@@ -409,15 +409,15 @@ def process_photo_initial(self, upload_id: str, photo_id: str):
                             except ValueError:
                                 pass
 
-                photo.processed_at = datetime.utcnow() # Mark as initially processed so UI shows it
+                # photo.processed_at = datetime.utcnow() # MOVED to analysis task to prevent "done" state until AI is done
                 
                 await db.commit()
                 
                 os.unlink(tmp_path)
                 print(f"Successfully finished initial processing for {photo_id}")
                 
-                # Trigger Analysis Task
-                celery_app.send_task('app.workers.thumbnail_worker.process_photo_analysis', args=[upload_id, photo_id])
+                # Manual Trigger Only (to prevent OOM)
+                # celery_app.send_task('app.workers.thumbnail_worker.process_photo_analysis', args=[upload_id, photo_id])
 
             except Exception as e:
                 print(f"Error processing photo {photo_id}: {e}")
@@ -729,6 +729,10 @@ def process_photo_analysis(self, upload_id: str, photo_id: str):
 
                 print(f"Classification complete.")
                 print(f"Analysis/Classification complete for {photo.filename}")
+
+                # Mark as fully processed only after AI analysis
+                photo.processed_at = datetime.utcnow()
+                await db.commit()
                 
             except Exception as e:
                 print(f"Error analyzing photo {photo_id}: {e}")

@@ -118,48 +118,68 @@ class BackgroundTransferManager {
             detail: { uploadId, total: files.length }
         }))
 
-        for (let i = 0; i < files.length; i++) {
-            const file = files[i]
-            const formData = new FormData()
-            formData.append('file', file)
+        // Concurrency limit to prevent blocking UI/Network and OOM on server
+        const MAX_CONCURRENT = 3
+        let active = 0
+        let i = 0
 
-            // Emit progress event
-            window.dispatchEvent(new CustomEvent('upload-progress', {
-                detail: {
-                    uploadId,
-                    current: i + 1,
-                    total: files.length,
-                    filename: file.name,
-                    progress: Math.round(((i + 1) / files.length) * 100)
-                }
-            }))
-
-            try {
-                const response = await fetch(`${apiBaseUrl}/upload/direct?filename=${encodeURIComponent(file.name)}`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: formData
-                })
-
-                if (!response.ok) {
-                    throw new Error(`Upload failed: ${response.statusText}`)
+        const next = async () => {
+            while (i < files.length) {
+                if (active >= MAX_CONCURRENT) {
+                    await new Promise(resolve => setTimeout(resolve, 100))
+                    continue
                 }
 
-                const data = await response.json()
-                results.push(data)
-            } catch (err) {
-                console.error(`Failed to upload ${file.name}:`, err)
+                const currentIndex = i++
+                active++
+                const file = files[currentIndex]
 
-                // Emit error event
-                window.dispatchEvent(new CustomEvent('upload-error', {
-                    detail: { uploadId, filename: file.name, error: err.message }
+                const formData = new FormData()
+                formData.append('file', file)
+
+                // Emit progress event
+                window.dispatchEvent(new CustomEvent('upload-progress', {
+                    detail: {
+                        uploadId,
+                        current: currentIndex + 1,
+                        total: files.length,
+                        filename: file.name,
+                        progress: Math.round(((currentIndex + 1) / files.length) * 100)
+                    }
                 }))
 
-                // Continue to next file instead of crashing entire batch
+                try {
+                    const response = await fetch(`${apiBaseUrl}/upload/direct?filename=${encodeURIComponent(file.name)}`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: formData
+                    })
+
+                    if (!response.ok) {
+                        throw new Error(`Upload failed: ${response.statusText}`)
+                    }
+
+                    const data = await response.json()
+                    results.push(data)
+                } catch (err) {
+                    console.error(`Failed to upload ${file.name}:`, err)
+                    window.dispatchEvent(new CustomEvent('upload-error', {
+                        detail: { uploadId, filename: file.name, error: err.message }
+                    }))
+                } finally {
+                    active--
+                }
             }
         }
+
+        // Start concurrent workers
+        const workers = []
+        for (let w = 0; w < MAX_CONCURRENT; w++) {
+            workers.push(next())
+        }
+        await Promise.all(workers)
 
         // Emit completion event
         window.dispatchEvent(new CustomEvent('upload-complete', {

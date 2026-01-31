@@ -46,6 +46,19 @@ export default function Upload() {
 
         setUploading(true)
 
+        // Listen for completion ONE TIME to trigger clustering
+        const onComplete = async () => {
+            console.log("Batch upload complete. Triggering cluster job...")
+            try {
+                // Trigger clustering (fire and forget)
+                await api.post('/people/cluster')
+            } catch (e) {
+                console.error("Failed to trigger clustering", e)
+            }
+            window.removeEventListener('upload-complete', onComplete)
+        }
+        window.addEventListener('upload-complete', onComplete)
+
         try {
             await backgroundTransferManager.uploadFiles(selectedFiles)
 
@@ -55,6 +68,7 @@ export default function Upload() {
             console.error('Upload initiation failed:', error)
             alert('Failed to start background upload. Please try again.')
             setUploading(false)
+            window.removeEventListener('upload-complete', onComplete)
         }
     }
 

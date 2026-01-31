@@ -59,7 +59,7 @@ async def trigger_clustering(
     scanned_count = 0
     for photo in photos:
         celery_app.send_task(
-            'app.workers.thumbnail_worker.process_photo_initial',
+            'app.workers.thumbnail_worker.process_photo_analysis',
             args=[str(photo.photo_id), str(photo.photo_id)]
         )
         scanned_count += 1

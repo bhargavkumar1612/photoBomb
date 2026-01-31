@@ -57,6 +57,16 @@ function PublicOnlyRoute({ children }) {
 }
 
 function App() {
+    useEffect(() => {
+        // Keep-Alive Heartbeat for Render (every 10 mins)
+        const interval = setInterval(() => {
+            fetch(import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/healthz` : '/api/v1/healthz')
+                .catch(err => console.debug("Heartbeat failed", err))
+        }, 10 * 60 * 1000) // 10 minutes
+
+        return () => clearInterval(interval)
+    }, [])
+
     return (
         <AuthProvider>
             <SearchProvider>
