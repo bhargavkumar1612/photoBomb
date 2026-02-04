@@ -88,16 +88,41 @@ async def list_hashtags(
 
 from app.api.photos import PhotoResponse
 
-@router.get("/{tag_id}/photos", response_model=List[PhotoResponse])
+@router.get("/{tag_identifier}/photos", response_model=List[PhotoResponse])
 async def list_hashtag_photos(
-    tag_id: uuid.UUID,
+    tag_identifier: str,
     limit: int = 100,
     offset: int = 0,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """List all photos for a specific document tag."""
-    # Need to include visual_tags for the response logic
+    """
+    List all photos for a specific tag.
+    Accepts either a UUID (tag_id) or a String (tag_name).
+    """
+    # 1. Determine if input is UUID or Name
+    target_tag_id = None
+    
+    try:
+        target_tag_id = uuid.UUID(tag_identifier)
+    except ValueError:
+        # Not a UUID, treat as Name
+        pass
+        
+    # 2. If it's a Name, resolve to ID
+    if not target_tag_id:
+        result = await db.execute(
+            select(Tag).where(Tag.name == tag_identifier)
+        )
+        tag_obj = result.scalar_one_or_none()
+        
+        if not tag_obj:
+            # Tag name doesn't exist -> No photos
+            return []
+            
+        target_tag_id = tag_obj.tag_id
+
+    # 3. Fetch Photos using the resolved ID
     from app.models.photo import Photo
     from sqlalchemy.orm import selectinload
     
@@ -106,7 +131,7 @@ async def list_hashtag_photos(
         .options(selectinload(Photo.visual_tags))
         .join(PhotoTag, PhotoTag.photo_id == Photo.photo_id)
         .where(
-            PhotoTag.tag_id == tag_id,
+            PhotoTag.tag_id == target_tag_id,
             Photo.user_id == current_user.user_id,
             Photo.deleted_at == None
         )
