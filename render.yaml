@@ -8,7 +8,7 @@ services:
     dockerContext: ./backend
     dockerfilePath: ./backend/Dockerfile.backend
     # explicit start command for backend
-    startCommand: ./scripts/start_web.sh
+    # startCommand removed (relying on Dockerfile CMD)
     # Rebuild backend only when backend core files change, but NOT worker implementation
     rootDir: .
     buildFilter:
@@ -73,7 +73,7 @@ services:
     dockerContext: ./backend
     dockerfilePath: ./backend/Dockerfile.worker
     # Start command runs dummy server + celery
-    startCommand: ./scripts/start_worker.sh
+    # startCommand removed (relying on Dockerfile CMD)
     # Rebuild worker only when backend core (models/db) or worker files change
     rootDir: .
     buildFilter:
