@@ -1,0 +1,33 @@
+# [BACKEND] Lightweight Image
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+# Install system dependencies (needed for psycopg2, magic, etc)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq-dev \
+    gcc \
+    python3-dev \
+    libmagic1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install python dependencies
+COPY requirements.backend.txt .
+RUN pip install --no-cache-dir -r requirements.backend.txt
+
+# Create non-root user
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
+# Copy app code
+COPY --chown=appuser:appuser . .
+
+# Permissions
+RUN chmod +x scripts/*.sh
+
+USER appuser
+EXPOSE 10000
+
+CMD ["./scripts/start_web.sh"]

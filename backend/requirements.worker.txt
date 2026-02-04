@@ -1,0 +1,11 @@
+# Inherit from backend requirements
+-r requirements.backend.txt
+
+# --- Image Processing & AI ---
+# Note: Base image already contains: torch, torchvision, torchaudio, face_recognition, numpy
+imagehash==4.3.1
+timm
+pillow-avif-plugin
+reverse_geocoder==1.5.1
+piexif==1.1.3
+pytesseract==0.3.10

@@ -14,7 +14,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./docs/database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U photobomb"]
+      test: [ "CMD-SHELL", "pg_isready -U photobomb" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -25,7 +25,7 @@ services:
     ports:
       - "6379:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
       timeout: 3s
       retries: 3
@@ -34,7 +34,7 @@ services:
   api:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.backend
     ports:
       - "8000:8000"
     environment:
@@ -58,7 +58,7 @@ services:
   worker:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.worker # Uses heavy AI image
     environment:
       - DATABASE_URL=postgresql+asyncpg://photobomb:password@postgres:5432/photobomb
       - REDIS_URL=redis://redis:6379/0
@@ -71,7 +71,7 @@ services:
     depends_on:
       - postgres
       - redis
-    command: celery -A app.celery_app worker -Q high -c 4 --loglevel=info
+    command: celery -A app.celery_app worker -Q high -c 2 --loglevel=info --reload
 
 volumes:
   postgres_data:

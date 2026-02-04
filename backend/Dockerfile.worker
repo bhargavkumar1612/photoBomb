@@ -1,0 +1,26 @@
+# [WORKER] Heavy Image with AI dependencies
+FROM bhargavkumar1612/photobomb-base:v1
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+# Install python dependencies (including heavy AI ones)
+COPY requirements.backend.txt .
+COPY requirements.worker.txt .
+RUN pip install --no-cache-dir -r requirements.worker.txt
+
+# Create non-root user
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
+# Copy app code
+COPY --chown=appuser:appuser . .
+
+# Permissions
+RUN chmod +x scripts/*.sh
+
+USER appuser
+EXPOSE 10000
+
+CMD ["./scripts/start_worker.sh"]

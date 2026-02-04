@@ -1,20 +1,34 @@
 services:
+  # 1. Backend API Service
   - type: web
     name: photobomb-backend
     runtime: docker
     region: singapore # Closest to Sydney (Supabase)
     plan: free
     dockerContext: ./backend
-    dockerfilePath: ./backend/Dockerfile
-    # Use our custom script to run both Worker and Web in one container (Save $$)
-    # startCommand moved to Dockerfile
-    envVars:
+    dockerfilePath: ./backend/Dockerfile.backend
+    # explicit start command for backend
+    startCommand: ./scripts/start_web.sh
+    # Rebuild backend only when backend core files change, but NOT worker implementation
+    rootDir: .
+    buildFilter:
+      paths:
+        - backend/app/**
+        - backend/alembic/**
+        - backend/requirements.txt
+        - backend/Dockerfile
+        - render.yaml
+      ignoredPaths:
+        - backend/app/workers/**
+        - backend/scripts/start_worker.sh
+        - frontend/**
+    envVars: &common-env
       - key: PORT
         value: 10000
       - key: PYTHON_VERSION
         value: 3.11.0
       - key: DATABASE_URL
-        sync: false # User will input this in dashboard
+        sync: false
       - key: REDIS_URL
         sync: false
       - key: B2_APPLICATION_KEY_ID
@@ -40,12 +54,69 @@ services:
       - key: DEBUG
         value: "false"
       - key: DATABASE_POOL_SIZE
-        value: "20"
+        value: "10" # Reduced pool size since we now have 2 services (total connections = 10+5)
       - key: DATABASE_MAX_OVERFLOW
-        value: "10"
+        value: "5"
       - key: JWT_ALGORITHM
         value: HS256
       - key: JWT_ACCESS_TOKEN_EXPIRE_MINUTES
         value: "60"
       - key: JWT_REFRESH_TOKEN_EXPIRE_DAYS
         value: "30"
+
+  # 2. Worker Service (Running as a Web Service to be Free)
+  - type: web
+    name: photobomb-worker
+    runtime: docker
+    region: singapore
+    plan: free
+    dockerContext: ./backend
+    dockerfilePath: ./backend/Dockerfile.worker
+    # Start command runs dummy server + celery
+    startCommand: ./scripts/start_worker.sh
+    # Rebuild worker only when backend core (models/db) or worker files change
+    rootDir: .
+    buildFilter:
+      paths:
+        - backend/app/**
+        - backend/requirements.txt
+        - backend/Dockerfile
+        - render.yaml
+      ignoredPaths:
+        - backend/app/api/**
+        - backend/scripts/start_web.sh
+        - frontend/**
+    # Re-use the same environment variables
+    envVars:
+      - key: DATABASE_POOL_SIZE
+        value: "5" # Worker needs fewer DB connections usually
+      - key: DATABASE_MAX_OVERFLOW
+        value: "0"
+      # Merge with common env vars (YAML anchor/alias isn't fully supported in all parsers, so we list them explicitely or rely on Render dashboard to sync if we could, but for render.yaml we must list them)
+      # Since YAML anchors might not be supported by Render's parser, we will duplicate the env vars to be safe.
+      - key: PORT
+        value: 10000
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: B2_APPLICATION_KEY_ID
+        sync: false
+      - key: B2_APPLICATION_KEY
+        sync: false
+      - key: B2_BUCKET_NAME
+        sync: false
+      - key: B2_BUCKET_ID
+        sync: false
+      - key: JWT_SECRET_KEY
+        sync: false
+      - key: APP_NAME
+        value: PhotoBomb
+      - key: APP_ENV
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: JWT_ALGORITHM
+        value: HS256

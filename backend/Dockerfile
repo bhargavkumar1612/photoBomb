@@ -19,7 +19,7 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser
 COPY --chown=appuser:appuser . .
 
 # Make scripts executable
-RUN chmod +x scripts/start_prod.sh
+RUN chmod +x scripts/*.sh
 
 # Switch to non-root user
 USER appuser
