@@ -1,20 +1,43 @@
-# [WORKER] Heavy Image with AI dependencies
-FROM bhargavkumar1612/photobomb-base:v1
+# [WORKER] Self-Contained Heavy Image with AI dependencies
+FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-# Install python dependencies (including heavy AI ones)
+# 1. Install System Dependencies for AI/Image processing
+# - build-essential/cmake: for building dlib
+# - libopenblas-dev/liblapack-dev: for numpy/scipy
+# - libgl1/libglib2.0-0: for opencv
+# - libvips: for fast image processing
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    libopenblas-dev \
+    liblapack-dev \
+    libx11-dev \
+    libgl1 \
+    libglib2.0-0 \
+    libvips \
+    libvips-dev \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# 2. Install Python Dependencies
 COPY requirements.backend.txt .
 COPY requirements.worker.txt .
+
+# Upgrade pip and install wheel to help with builds
+RUN pip install --upgrade pip wheel setuptools
+
+# Install requirements (this will take time for Torch/Dlib)
 RUN pip install --no-cache-dir -r requirements.worker.txt
 
-# Create non-root user
+# 3. Create non-root user
 RUN groupadd -r appuser && useradd -r -g appuser appuser
 
-# Copy app code
+# 4. Copy app code
 COPY --chown=appuser:appuser . .
 
 # Permissions

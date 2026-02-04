@@ -65,58 +65,59 @@ services:
         value: "30"
 
   # 2. Worker Service (Running as a Web Service to be Free)
-  - type: web
-    name: photobomb-worker
-    runtime: docker
-    region: singapore
-    plan: free
-    dockerContext: ./backend
-    dockerfilePath: ./backend/Dockerfile.worker
-    # Start command runs dummy server + celery
-    # startCommand removed (relying on Dockerfile CMD)
-    # Rebuild worker only when backend core (models/db) or worker files change
-    rootDir: .
-    buildFilter:
-      paths:
-        - backend/app/**
-        - backend/requirements.txt
-        - backend/Dockerfile
-        - render.yaml
-      ignoredPaths:
-        - backend/app/api/**
-        - backend/scripts/start_web.sh
-        - frontend/**
-    # Re-use the same environment variables
-    envVars:
-      - key: DATABASE_POOL_SIZE
-        value: "5" # Worker needs fewer DB connections usually
-      - key: DATABASE_MAX_OVERFLOW
-        value: "0"
-      # Merge with common env vars (YAML anchor/alias isn't fully supported in all parsers, so we list them explicitely or rely on Render dashboard to sync if we could, but for render.yaml we must list them)
-      # Since YAML anchors might not be supported by Render's parser, we will duplicate the env vars to be safe.
-      - key: PORT
-        value: 10000
-      - key: PYTHON_VERSION
-        value: 3.11.0
-      - key: DATABASE_URL
-        sync: false
-      - key: REDIS_URL
-        sync: false
-      - key: B2_APPLICATION_KEY_ID
-        sync: false
-      - key: B2_APPLICATION_KEY
-        sync: false
-      - key: B2_BUCKET_NAME
-        sync: false
-      - key: B2_BUCKET_ID
-        sync: false
-      - key: JWT_SECRET_KEY
-        sync: false
-      - key: APP_NAME
-        value: PhotoBomb
-      - key: APP_ENV
-        value: production
-      - key: DEBUG
-        value: "false"
-      - key: JWT_ALGORITHM
-        value: HS256
+  # 2. Worker Service (Running as a Web Service to be Free)
+  # - type: web
+  #   name: photobomb-worker
+  #   runtime: docker
+  #   region: singapore
+  #   plan: free
+  #   dockerContext: ./backend
+  #   dockerfilePath: ./backend/Dockerfile.worker
+  #   # Start command runs dummy server + celery
+  #   # startCommand removed (relying on Dockerfile CMD)
+  #   # Rebuild worker only when backend core (models/db) or worker files change
+  #   rootDir: .
+  #   buildFilter:
+  #     paths:
+  #       - backend/app/**
+  #       - backend/requirements.txt
+  #       - backend/Dockerfile
+  #       - render.yaml
+  #     ignoredPaths:
+  #       - backend/app/api/**
+  #       - backend/scripts/start_web.sh
+  #       - frontend/**
+  #   # Re-use the same environment variables
+  #   envVars:
+  #     - key: DATABASE_POOL_SIZE
+  #       value: "5" # Worker needs fewer DB connections usually
+  #     - key: DATABASE_MAX_OVERFLOW
+  #       value: "0"
+  #     # Merge with common env vars (YAML anchor/alias isn't fully supported in all parsers, so we list them explicitely or rely on Render dashboard to sync if we could, but for render.yaml we must list them)
+  #     # Since YAML anchors might not be supported by Render's parser, we will duplicate the env vars to be safe.
+  #     - key: PORT
+  #       value: 10000
+  #     - key: PYTHON_VERSION
+  #       value: 3.11.0
+  #     - key: DATABASE_URL
+  #       sync: false
+  #     - key: REDIS_URL
+  #       sync: false
+  #     - key: B2_APPLICATION_KEY_ID
+  #       sync: false
+  #     - key: B2_APPLICATION_KEY
+  #       sync: false
+  #     - key: B2_BUCKET_NAME
+  #       sync: false
+  #     - key: B2_BUCKET_ID
+  #       sync: false
+  #     - key: JWT_SECRET_KEY
+  #       sync: false
+  #     - key: APP_NAME
+  #       value: PhotoBomb
+  #     - key: APP_ENV
+  #       value: production
+  #     - key: DEBUG
+  #       value: "false"
+  #     - key: JWT_ALGORITHM
+  #       value: HS256
