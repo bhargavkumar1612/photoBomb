@@ -33,44 +33,7 @@ class PersonResponse(BaseModel):
 class PersonUpdate(BaseModel):
     name: str
 
-@router.post("/cluster")
-async def trigger_clustering(
-    background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    Trigger full library analysis (Scan) and then Clustering.
-    1. Queues 'process_upload' for any unprocessed photos (Faces, Objects, Animals, Text).
-    2. Queues 'cluster_faces' to group detected faces.
-    """
-    from app.celery_app import celery_app
-    
-    # 1. Triger Rescan for unprocessed photos
-    result = await db.execute(
-        select(Photo).where(
-            Photo.user_id == current_user.user_id,
-            Photo.deleted_at == None,
-            Photo.processed_at == None
-        )
-    )
-    photos = result.scalars().all()
-    
-    scanned_count = 0
-    for photo in photos:
-        celery_app.send_task(
-            'app.workers.thumbnail_worker.process_photo_analysis',
-            args=[str(photo.photo_id), str(photo.photo_id)]
-        )
-        scanned_count += 1
-    
-    # 2. Trigger Clustering
-    background_tasks.add_task(cluster_faces, current_user.user_id)
-    
-    return {
-        "message": f"Analysis started: Scanning {scanned_count} new photos. Face clustering running in background.",
-        "scanned_count": scanned_count
-    }
+
 
 from sqlalchemy.orm import selectinload
 

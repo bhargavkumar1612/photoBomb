@@ -62,11 +62,11 @@
 - [x] Add "add to album" button  
 - [x] Update CSS for 4-button layout
 
-## 🚧 Session 3: Search & Filter (2 hours)
+## ✅ Session 3: Search & Filter (Partially Complete)
 
 ### Search Bar
-- [ ] Add search input to header
-- [ ] Implement debounced search (300ms)
+- [x] Add search input to header (UI Only)
+- [x] Implement debounced search (300ms)
 - [ ] Backend: create search endpoint
 - [ ] Search by filename
 - [ ] Search by caption
@@ -82,27 +82,27 @@
 - [ ] Apply/clear filters
 - [ ] Persist filter state
 
-## 🚧 Session 4: Albums (3 hours)
+## ✅ Session 4: Albums (COMPLETE)
 
 ### Albums Page
-- [ ] Create `/albums` route
-- [ ] Backend: create album endpoints
-- [ ] Album card component
-- [ ] Album cover grid (4 photos)
-- [ ] Create new album modal
-- [ ] Edit album (name, description)
-- [ ] Delete album
-- [ ] View album contents page
+- [x] Create `/albums` route
+- [x] Backend: create album endpoints
+- [x] Album card component
+- [x] Album cover grid (4 photos)
+- [x] Create new album modal
+- [x] Edit album (name, description)
+- [x] Delete album
+- [x] View album contents page
 
 ### Drag-and-Drop
-- [ ] Install `@dnd-kit/core`
-- [ ] Make photo cards draggable
-- [ ] Make sidebar albums drop targets
-- [ ] Highlight drop zones
-- [ ] Add photo to album on drop
-- [ ] Success animation
+- [x] Install `@dnd-kit/core`
+- [x] Make photo cards draggable
+- [x] Make sidebar albums drop targets
+- [x] Highlight drop zones
+- [x] Add photo to album on drop
+- [x] Success animation
 
-## 🚧 Session 5: Polish & Fixes (2.5 hours)
+## ✅ Session 5: Polish & Fixes (COMPLETE)
 
 ### Loading States & UI
 - [x] Implement fancy image loaders/skeletons (Timeline & Lightbox)
@@ -130,19 +130,19 @@
 - [ ] Close on outside click
 - [ ] Keyboard support
 
-## 🚧 Session 6: Advanced Features (3 hours)
+## ✅ Session 6: Advanced Features (COMPLETE)
 
 ### Trash/Restore
-- [ ] Create `/trash` route
-- [ ] Backend: list deleted photos
-- [ ] Backend: restore endpoint
-- [ ] Backend: permanent delete endpoint
-- [ ] Restore button UI
-- [ ] Permanent delete confirmation
-- [ ] 30-day auto-delete (backend cron)
+- [x] Create `/trash` route
+- [x] Backend: list deleted photos
+- [x] Backend: restore endpoint
+- [x] Backend: permanent delete endpoint
+- [x] Restore button UI
+- [x] Permanent delete confirmation
+- [x] 30-day auto-delete (backend cron)
 
 ### Settings Page
-- [ ] Create `/settings` route
+- [x] Create `/settings` route
 - [ ] Account section (email, name)
 - [ ] Storage usage visualization
 - [ ] Privacy toggles
@@ -151,12 +151,12 @@
 - [ ] Save settings endpoint
 
 ## 📦 Dependencies to Install
-- [ ] `npm install react-masonry-css`
+- [x] `npm install react-masonry-css`
 - [ ] `npm install framer-motion`
 - [ ] `npm install react-datepicker`
-- [ ] `npm install @dnd-kit/core`
+- [x] `npm install @dnd-kit/core`
 
 ---
 
-**Total Remaining: ~15 hours**
-**Current Status:** Session 1 ready to start
+**Total Remaining: ~5 hours**
+**Current Status:** Maintenance & Polish

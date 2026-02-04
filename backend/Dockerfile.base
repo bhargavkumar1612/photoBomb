@@ -20,7 +20,7 @@ RUN apt-get update && apt-get install -y \
 # Install the heavy hitters directly
 # We point to the official CPU-only index to keep things lean
 RUN pip install --no-cache-dir \
-    torch==2.2.1 torchvision==0.17.1 \
+    torch==2.6.0 torchvision==0.21.0 \
     --index-url https://download.pytorch.org/whl/cpu
 
 RUN pip install --no-cache-dir \
@@ -29,3 +29,22 @@ RUN pip install --no-cache-dir \
     face_recognition==1.3.0 \
     transformers \
     pyvips
+
+# Create non-root user
+RUN groupadd -r appuser && useradd -r -g appuser -m -d /home/appuser appuser
+
+# Set environment variables for model caching
+ENV HF_HOME=/home/appuser/model_cache
+ENV SENTENCE_TRANSFORMERS_HOME=/home/appuser/model_cache
+
+# Create model cache directory and set permissions
+RUN mkdir -p ${HF_HOME} && chown -R appuser:appuser ${HF_HOME}
+
+# Copy preload script (assuming build context is backend/)
+COPY scripts/preload_models.py /app/scripts/
+
+# Switch to non-root user
+USER appuser
+
+# Pre-load AI models
+RUN python /app/scripts/preload_models.py

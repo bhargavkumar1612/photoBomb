@@ -22,6 +22,7 @@ import AnimalDetailPage from './pages/AnimalDetailPage'
 import HashtagsPage from './pages/HashtagsPage'
 import HashtagDetailPage from './pages/HashtagDetailPage'
 import PlaceholderPage from './pages/PlaceholderPage'
+import AdminDashboard from './pages/AdminDashboard'
 import UploadProgressWidget from './components/UploadProgressWidget'
 import './App.css'
 
@@ -52,6 +53,18 @@ function PublicOnlyRoute({ children }) {
 
     // While redirecting, return null to avoid flash
     if (user) return null
+
+    return children
+}
+
+function AdminRoute({ children }) {
+    const { user, loading } = useAuth()
+
+    if (loading) return <div className="loading">Loading...</div>
+
+    if (!user || !user.is_admin) {
+        return <Navigate to="/" replace />
+    }
 
     return children
 }
@@ -105,6 +118,11 @@ function App() {
                             <Route path="/trash" element={<Trash />} />
                             <Route path="/settings" element={<Settings />} />
                             <Route path="/upload" element={<Upload />} />
+                            <Route path="/admin" element={
+                                <AdminRoute>
+                                    <AdminDashboard />
+                                </AdminRoute>
+                            } />
                         </Route>
 
                         {/* Catch all - redirect to home (which is protected, so will redirect to login if needed) */}

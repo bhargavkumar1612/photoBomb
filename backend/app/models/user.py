@@ -35,6 +35,7 @@ class User(Base):
     
     # Privacy settings
     face_recognition_enabled = Column(Boolean, default=False)
+    is_admin = Column(Boolean, default=False)
     
     # Storage quota (bytes)
     storage_quota_bytes = Column(BigInteger, default=107374182400)  # 100 GB

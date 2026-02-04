@@ -53,12 +53,12 @@ BE_PID=$!
 cd ..
  
 # Start Celery Worker
-echo "👷 Starting Celery Worker..."
-cd backend
-export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
-celery -A app.celery_app worker --loglevel=info --pool=solo -Q high,low,celery &
-WORKER_PID=$!
-cd ..
+# echo "👷 Starting Celery Worker..."
+# cd backend
+# export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
+# celery -A app.celery_app worker --loglevel=info --pool=solo -Q high,low,celery &
+# WORKER_PID=$!
+# cd ..
 
 # Start Frontend
 echo "⚛️  Starting Frontend (http://localhost:3000)..."

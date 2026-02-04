@@ -19,7 +19,17 @@ celery_app = Celery(
     backend=settings.REDIS_URL,
     broker_use_ssl=redis_backend_use_ssl if settings.REDIS_URL.startswith('rediss://') else None,
     redis_backend_use_ssl=redis_backend_use_ssl if settings.REDIS_URL.startswith('rediss://') else None,
+    broker_connection_retry_on_startup=True,
 )
+
+# Configure transport options for stability
+celery_app.conf.broker_transport_options = {
+    'visibility_timeout': 3600,  # 1 hour
+    'socket_timeout': 60,       # 60 seconds
+    'socket_connect_timeout': 60,
+    'socket_keepalive': True,
+    'health_check_interval': 10,
+}
 
 # Configuration
 celery_app.conf.update(

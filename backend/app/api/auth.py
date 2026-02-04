@@ -191,7 +191,8 @@ async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
             "user_id": str(user.user_id),
             "email": user.email,
             "full_name": user.full_name,
-            "face_recognition_enabled": user.face_recognition_enabled
+            "face_recognition_enabled": user.face_recognition_enabled,
+            "is_admin": user.is_admin
         }
     )
 
@@ -315,7 +316,8 @@ async def google_login(
                 "user_id": str(user.user_id),
                 "email": user.email,
                 "full_name": user.full_name,
-                "face_recognition_enabled": user.face_recognition_enabled
+                "face_recognition_enabled": user.face_recognition_enabled,
+                "is_admin": user.is_admin
             }
         )
         
@@ -340,6 +342,7 @@ async def get_current_user_info(
         "email": current_user.email,
         "full_name": current_user.full_name,
         "face_recognition_enabled": current_user.face_recognition_enabled,
+        "is_admin": current_user.is_admin,
         "storage_used_bytes": current_user.storage_used_bytes,
         "storage_quota_bytes": current_user.storage_quota_bytes
     }

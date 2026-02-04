@@ -34,15 +34,7 @@ class PhotoResponse(BaseModel):
     thumb_urls: dict
     taken_at: Optional[Any] = None
 
-@router.post("/cluster")
-async def trigger_clustering(
-    background_tasks: BackgroundTasks,
-    force_reset: bool = False,
-    current_user: User = Depends(get_current_user)
-):
-    """Trigger background animal clustering."""
-    background_tasks.add_task(cluster_animals, current_user.user_id, force_reset=force_reset)
-    return {"message": "Animal clustering started in background"}
+
 
 @router.get("", response_model=List[AnimalResponse])
 async def list_animals(

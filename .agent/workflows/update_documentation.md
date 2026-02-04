@@ -10,6 +10,8 @@ This workflow guides you through checking the validity of the project's document
 ## Steps
 
 1. **Identify Recent Changes**:
+   - Only proceed if there are changes to documentation that need to be made.
+   - Review existing `task.md` and `implementation_plan.md` artifacts (in your brain or in `docs/` if available) to understand what was recently planned and implemented.
    - Review your recent conversation history and `git log` (if available/relevant) to identify new features, bug fixes, or architectural changes since the last documentation update.
    - Look for changes in `CHANGELOG.md` under [Unreleased] if it exists.
 

@@ -22,15 +22,7 @@ const AnimalsPage = () => {
         }
     };
 
-    const triggerClustering = async () => {
-        try {
-            await api.post("/animals/cluster");
-            alert("Animal clustering started in background. Refresh in a few moments to see results.");
-        } catch (error) {
-            console.error("Failed to trigger clustering", error);
-            alert("Failed to start clustering.");
-        }
-    };
+
 
     if (loading) {
         return (
@@ -44,19 +36,6 @@ const AnimalsPage = () => {
         <div style={{ padding: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>Animals</h1>
-                <button
-                    onClick={triggerClustering}
-                    style={{
-                        padding: '10px 15px',
-                        backgroundColor: '#4f46e5',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: 'pointer'
-                    }}
-                >
-                    Scan for Animals
-                </button>
             </div>
 
             <p style={{ color: '#666', marginBottom: '30px' }}>
@@ -66,7 +45,7 @@ const AnimalsPage = () => {
             {animals.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
                     <p>No animals identified yet.</p>
-                    <p>Upload photos with animals and click "Scan for Animals".</p>
+                    <p>Upload photos with animals to see them here.</p>
                 </div>
             ) : (
                 <div style={{

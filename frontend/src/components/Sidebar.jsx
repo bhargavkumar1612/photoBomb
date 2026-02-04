@@ -13,9 +13,11 @@ import {
     Hash,
     Mountain
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import './Sidebar.css';
 
 export default function Sidebar({ isOpen, onClose }) {
+    const { user } = useAuth();
     const navItems = [
         { path: '/', icon: <Image size={20} />, label: 'Photos' },
         { path: '/explore', icon: <Search size={20} />, label: 'Explore' },
@@ -62,6 +64,16 @@ export default function Sidebar({ isOpen, onClose }) {
 
                 {/* Footer / Settings */}
                 <div className="sidebar-footer">
+                    {user?.is_admin && (
+                        <NavLink
+                            to="/admin"
+                            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+                            onClick={() => window.innerWidth <= 768 && onClose()}
+                        >
+                            <span className="nav-item-icon"><Mountain size={20} /></span>
+                            <span className="nav-item-text">Admin</span>
+                        </NavLink>
+                    )}
                     <NavLink
                         to="/settings"
                         className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}

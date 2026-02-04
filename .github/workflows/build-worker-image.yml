@@ -1,17 +1,18 @@
-name: Build and Push Base Image
+name: Build and Push Worker Image
 
 on:
-  workflow_dispatch: # Manual trigger
+  workflow_dispatch:
   push:
     branches: [ "main" ]
     paths:
-      - 'backend/Dockerfile.base'
-      - 'backend/scripts/preload_models.py'
-      - 'backend/requirements.base.txt'
-      - '.github/workflows/build-base-image.yml'
+      - 'backend/**'
+      # Exclude base image files to avoid redundant concurrent builds (optional, but cleaner)
+      - '!backend/Dockerfile.base'
+      - '!backend/scripts/preload_models.py'
+      - '.github/workflows/build-worker-image.yml'
 
 jobs:
-  build-base:
+  build-worker:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -33,11 +34,9 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./backend
-          file: ./backend/Dockerfile.base
-          platforms: linux/amd64 # Render uses amd64
+          file: ./backend/Dockerfile.worker
+          platforms: linux/amd64
           push: true
-          tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/photobomb-base:latest
-            ${{ secrets.DOCKERHUB_USERNAME }}/photobomb-base:v1
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/photobomb-worker:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max

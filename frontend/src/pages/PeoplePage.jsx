@@ -22,15 +22,7 @@ const PeoplePage = () => {
         }
     };
 
-    const triggerClustering = async () => {
-        try {
-            await api.post("/people/cluster");
-            alert("Face clustering started in background. Refresh in a few moments to see results.");
-        } catch (error) {
-            console.error("Failed to trigger clustering", error);
-            alert("Failed to start clustering.");
-        }
-    };
+
 
     if (loading) {
         return (
@@ -44,25 +36,12 @@ const PeoplePage = () => {
         <div style={{ padding: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>People</h1>
-                <button
-                    onClick={triggerClustering}
-                    style={{
-                        padding: '10px 15px',
-                        backgroundColor: '#4f46e5',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: 'pointer'
-                    }}
-                >
-                    Scan for People
-                </button>
             </div>
 
             {people.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
                     <p>No people found yet.</p>
-                    <p>Upload photos with faces and click "Scan for People".</p>
+                    <p>Upload photos with faces to see them here.</p>
                 </div>
             ) : (
                 <div style={{

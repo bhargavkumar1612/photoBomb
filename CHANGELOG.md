@@ -25,11 +25,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Keyboard Accessibility**: Full keyboard navigation support across the application. Implemented global focus rings, `Escape` to close modals, `Enter` to confirm actions, and focusable photo grid items.
 - **Direct Photo Sharing**: Implemented end-to-end photo sharing via email, including "Inbox" and "Connections" tabs, secure invite links for non-users, and claim functionality upon registration.
 - **Animal Detection Parity**: Fully implemented Animal detection with dedicated API endpoints, filtering, and UI (feature parity with People).
+- **Admin Dashboard**: Comprehensive admin interface with multi-user selection (checklist UI), maintenance triggers (clustering, re-scanning), and live system logs.
+- **GCE Deployment Script**: Added `deploy_gce_worker.sh` to automate the update and restart process for remote Celery workers on Google Compute Engine.
+
+### Fixed
+- **Admin API Validation**: Resolved `ResponseValidationError` by handling `NULL` values for `is_admin` in the database.
+- **Admin Routing**: Fixed 404 error on `/admin/users` endpoint by correctly registering and implementing the listing function.
+- **Security**: Enforced strict role-based access control (RBAC) on admin routes in both Frontend (`AdminRoute`) and Backend.
 
 ### Changed
 - **Hashtag UI**: refined Hashtag Detail view to hide raw UUIDs, displaying a fallback title if the tag name is unresolvable, and sorting tags by confidence score.
 
 ### Fixed
+- **UI Z-Index & Initials**: Fixed z-index stacking issue for User Profile dropdown and corrected fallback initials generation.
 - **Broken Thumbnails**: Fixed "NoSuchKey" errors in `rescan_photos.py` and successfully repaired 65+ broken thumbnails/orphaned files.
 - **Hashtag Display**: Resolved "0 Photos" bug for certain hashtags by enabling UUID-based lookup in frontend routing.
 - **OCR Tagging**: Restored Tesseract OCR functionality, enabling text extraction for documents (e.g., #invoice, #receipt).

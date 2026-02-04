@@ -33,6 +33,8 @@ A production-ready photo service (PWA) with full planning documentation and work
 - **Visual Hashtags** (Unified object/scene detection with optimized batch fetching)
 - **Maintainability** (Database keep-alive heartbeat via Celery)
 - **Keyboard Accessibility** (Global focus management, Modal navigation, Keyboard shortcuts)
+- **Admin Dashboard** (Multi-user selection, Maintenance triggers, System logs)
+- **GCE Deployment Utilities** (Automated update script for remote workers)
 
 **📋 Planned:**
 - Search & Discovery (Text + Semantic)
