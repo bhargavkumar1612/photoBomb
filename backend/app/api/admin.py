@@ -82,16 +82,20 @@ async def trigger_admin_clustering(
                 user_msg.append("Faces reset")
             
             # background_tasks.add_task(cluster_faces, user_id)
-            from app.workers.face_worker import task_cluster_faces
-            task_cluster_faces.delay(str(user_id))
+            from app.celery_app import celery_app
+            celery_app.send_task('app.workers.face_worker.cluster_faces', args=[str(user_id)])
             user_msg.append("Face clustering queued")
 
         # 2. Animals
         if "animals" in request.scopes:
             # animal clustering service handles reset logic internally
             # background_tasks.add_task(cluster_animals, user_id, force_reset=request.force_reset)
-            from app.workers.face_worker import task_cluster_animals
-            task_cluster_animals.delay(str(user_id), force_reset=request.force_reset)
+            from app.celery_app import celery_app
+            celery_app.send_task(
+                'app.workers.face_worker.cluster_animals',
+                args=[str(user_id)],
+                kwargs={'force_reset': request.force_reset}
+            )
             user_msg.append("Animal clustering queued")
 
         # 3. Hashtags (Re-scan)

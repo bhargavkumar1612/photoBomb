@@ -10,6 +10,8 @@ on:
       - '!backend/Dockerfile.base'
       - '!backend/scripts/preload_models.py'
       - '!backend/requirements.base.txt'
+      - '!backend/app/api/**'
+      - '!backend/app/main.py'
       - '.github/workflows/build-worker-image.yml'
   workflow_run:
     workflows: ["Build and Push Base Image"]
