@@ -9,6 +9,7 @@ on:
       # Exclude base image files to avoid redundant concurrent builds (optional, but cleaner)
       - '!backend/Dockerfile.base'
       - '!backend/scripts/preload_models.py'
+      - '!backend/requirements.base.txt'
       - '.github/workflows/build-worker-image.yml'
   workflow_run:
     workflows: ["Build and Push Base Image"]
@@ -18,7 +19,7 @@ on:
 jobs:
   build-worker:
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
