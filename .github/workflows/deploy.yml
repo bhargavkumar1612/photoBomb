@@ -45,6 +45,10 @@ jobs:
             # Create .env file from secrets
             echo "${{ secrets.ENV_FILE }}" > backend/.env
             
+            # Sanitize .env file
+            sed -i 's/^export //g' backend/.env
+            sed -i 's/^[[:space:]]*//g' backend/.env
+            
             # Restart containers
             docker compose down
             docker compose up -d --build

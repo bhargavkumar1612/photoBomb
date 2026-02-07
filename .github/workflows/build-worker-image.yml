@@ -62,16 +62,26 @@ jobs:
           script: |
             echo "🚀 Deploying new worker image..."
             
-            # Create .env file from secrets (Critical for docker run --env-file)
+            # Switch to deployment directory
+            cd /opt/photobomb || mkdir -p /opt/photobomb && cd /opt/photobomb
+            
+            # Create .env file from secrets
             echo "${{ secrets.ENV_FILE }}" > .env
             
-            # Ensure script is executable (just in case)
-            if [ -f "./deploy_gce_worker.sh" ]; then
+            # Sanitize .env file (Docker doesn't like 'export' or leading spaces)
+            sed -i 's/^export //g' .env
+            sed -i 's/^[[:space:]]*//g' .env
+            
+            # Ensure script is executable
+            if [ -f "./scripts/deploy_gce_worker.sh" ]; then
+              chmod +x ./scripts/deploy_gce_worker.sh
+              ./scripts/deploy_gce_worker.sh
+            elif [ -f "./deploy_gce_worker.sh" ]; then
               chmod +x ./deploy_gce_worker.sh
               ./deploy_gce_worker.sh
             else
-              echo "⚠️ deploy_gce_worker.sh not found!"
-              # Fallback commands if script is missing
+              echo "⚠️ deploy_gce_worker.sh not found in /opt/photobomb!"
+              # Fallback commands
               sudo docker stop photo-worker || true
               sudo docker rm photo-worker || true
               sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/photobomb-worker:latest
@@ -79,6 +89,7 @@ jobs:
                 --name photo-worker \
                 --env-file .env \
                 -e APP_ENV=production \
+                --network photobomb_default \
                 --restart unless-stopped \
                 ${{ secrets.DOCKERHUB_USERNAME }}/photobomb-worker:latest
             fi
