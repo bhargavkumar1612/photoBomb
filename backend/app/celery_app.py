@@ -41,6 +41,7 @@ celery_app.conf.update(
     task_routes={
         'app.workers.thumbnail_worker.*': {'queue': 'high'},
         'app.workers.face_worker.*': {'queue': 'low'},
+        'app.workers.db_keepalive_worker.*': {'queue': 'low'},
     },
     task_acks_late=True,
     worker_prefetch_multiplier=1,
@@ -52,7 +53,7 @@ celery_app.conf.update(
 celery_app.conf.imports = [
     'app.workers.thumbnail_worker',
     'app.workers.db_keepalive_worker',
-    # 'app.workers.face_worker', # Uncomment when face worker is ready
+    'app.workers.face_worker',
 ]
 
 from celery.schedules import crontab
