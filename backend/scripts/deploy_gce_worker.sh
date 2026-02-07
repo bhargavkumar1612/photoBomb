@@ -30,6 +30,9 @@ if [ ! -f .env ]; then
     echo "⚠️ Warning: .env file not found in current directory!"
 fi
 
+# Ensure network exists
+sudo docker network create photobomb_default || true
+
 sudo docker run -d \
   --name $CONTAINER_NAME \
   --env-file .env \

@@ -72,15 +72,25 @@ jobs:
             sed -i 's/^export //g' .env
             sed -i 's/^[[:space:]]*//g' .env
             
-            # Ensure script is executable
-            if [ -f "./scripts/deploy_gce_worker.sh" ]; then
-              chmod +x ./scripts/deploy_gce_worker.sh
-              ./scripts/deploy_gce_worker.sh
+            # Ensure network exists (Critical for first-time run)
+            sudo docker network create photobomb_default || true
+            
+            # Locate and run deployment script
+            SCRIPT_PATH=""
+            if [ -f "./backend/scripts/deploy_gce_worker.sh" ]; then
+              SCRIPT_PATH="./backend/scripts/deploy_gce_worker.sh"
+            elif [ -f "./scripts/deploy_gce_worker.sh" ]; then
+              SCRIPT_PATH="./scripts/deploy_gce_worker.sh"
             elif [ -f "./deploy_gce_worker.sh" ]; then
-              chmod +x ./deploy_gce_worker.sh
-              ./deploy_gce_worker.sh
+              SCRIPT_PATH="./deploy_gce_worker.sh"
+            fi
+            
+            if [ -n "$SCRIPT_PATH" ]; then
+              echo "🚀 Found script at $SCRIPT_PATH"
+              chmod +x "$SCRIPT_PATH"
+              "$SCRIPT_PATH"
             else
-              echo "⚠️ deploy_gce_worker.sh not found in /opt/photobomb!"
+              echo "⚠️ deploy_gce_worker.sh not found in /opt/photobomb or subdirectories!"
               # Fallback commands
               sudo docker stop photo-worker || true
               sudo docker rm photo-worker || true
