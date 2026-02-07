@@ -46,5 +46,35 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/photobomb-worker:latest
-          cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  deploy-worker:
+    needs: build-worker
+    runs-on: ubuntu-latest
+    if: ${{ success() }}
+    steps:
+      - name: Deploy to GCE via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.GCE_HOST }}
+          username: ${{ secrets.GCE_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            echo "🚀 Deploying new worker image..."
+            # Ensure script is executable (just in case)
+            if [ -f "./deploy_gce_worker.sh" ]; then
+              chmod +x ./deploy_gce_worker.sh
+              ./deploy_gce_worker.sh
+            else
+              echo "⚠️ deploy_gce_worker.sh not found!"
+              # Fallback commands if script is missing
+              sudo docker stop photo-worker || true
+              sudo docker rm photo-worker || true
+              sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/photobomb-worker:latest
+              sudo docker run -d \
+                --name photo-worker \
+                --env-file .env \
+                -e APP_ENV=production \
+                --restart unless-stopped \
+                ${{ secrets.DOCKERHUB_USERNAME }}/photobomb-worker:latest
+            fi

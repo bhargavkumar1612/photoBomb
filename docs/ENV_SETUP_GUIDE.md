@@ -97,7 +97,7 @@ Since you're using Supabase, you'll need a Redis service for Celery. **Upstash**
 1. Login to B2 dashboard
 2. Click **"Buckets"** → **"Create a Bucket"**
 3. Settings:
-   - **Bucket Unique Name**: `photobomb-production-YOUR-USERNAME` (must be globally unique)
+   - **Bucket Unique Name**: `photobomb-production-YOUR-GCE_USERNAME` (must be globally unique)
    - **Files in Bucket**: **Private** ✅ (important for security)
    - **Default Encryption**: Disabled (we'll handle encryption)
    - **Object Lock**: Disabled

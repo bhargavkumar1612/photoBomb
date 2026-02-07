@@ -34,8 +34,8 @@ Go to your repository **Settings** > **Secrets and variables** > **Actions** and
 ### Backend Secrets (for VPS Deployment)
 | Secret Name | Description |
 |---|---|
-| `HOST` | The IP address of your VPS. |
-| `USERNAME` | Your SSH username (usually `root` or `ubuntu`). |
+| `GCE_HOST` | The IP address of your VPS. |
+| `GCE_USERNAME` | Your SSH username (usually `root` or `ubuntu`). |
 | `SSH_KEY` | Your private SSH key. |
 | `S3_ENDPOINT_URL` | Cloudflare R2 Endpoint URL (e.g. `https://<account>.r2.cloudflarestorage.com`). |
 | `S3_ACCESS_KEY_ID` | R2 Access Key ID. |
@@ -44,6 +44,25 @@ Go to your repository **Settings** > **Secrets and variables** > **Actions** and
 | `S3_REGION_NAME` | R2 Region (usually `auto`). |
 | `JWT_SECRET` | A long random string for JWT signing. |
 | `DB_PASSWORD` | A secure password for the production database. |
+
+### 🔑 Setting up SSH Access
+
+1.  **Generate a new SSH key pair** on your local machine:
+    ```bash
+    ssh-keygen -t rsa -b 4096 -C "github-actions-deploy" -f ./github_deploy_key
+    ```
+    This creates `github_deploy_key` (Private Key) and `github_deploy_key.pub` (Public Key).
+
+2.  **Add Public Key to Server**:
+    - **GCE**: Go to Compute Engine -> Metadata -> SSH Keys -> Edit -> Add Item. Paste the content of `github_deploy_key.pub`.
+    - **VPS**: Append content of `github_deploy_key.pub` to `~/.ssh/authorized_keys` on your server.
+
+3.  **Add Private Key to GitHub**:
+    - Copy the entire content of `github_deploy_key`.
+    - Go to your GitHub Repo -> Settings -> Secrets and variables -> Actions -> New repository secret.
+    - Name: `SSH_KEY`
+    - Value: (Paste key content)
+
 
 ### Frontend Secrets (for Cloudflare Deployment)
 | Secret Name | Description |
