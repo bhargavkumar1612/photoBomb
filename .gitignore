@@ -27,3 +27,5 @@ secrets/
 *.log
 backend/deploy_key
 backend/deploy_key.pub
+backend/github_deploy_key
+backend/github_deploy_key.pub

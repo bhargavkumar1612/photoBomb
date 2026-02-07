@@ -34,6 +34,7 @@ sudo docker run -d \
   --name $CONTAINER_NAME \
   --env-file .env \
   -e APP_ENV=production \
+  --network photobomb_default \
   --restart unless-stopped \
   $IMAGE_NAME
 

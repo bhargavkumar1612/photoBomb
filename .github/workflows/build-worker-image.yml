@@ -61,6 +61,10 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           script: |
             echo "🚀 Deploying new worker image..."
+            
+            # Create .env file from secrets (Critical for docker run --env-file)
+            echo "${{ secrets.ENV_FILE }}" > .env
+            
             # Ensure script is executable (just in case)
             if [ -f "./deploy_gce_worker.sh" ]; then
               chmod +x ./deploy_gce_worker.sh
