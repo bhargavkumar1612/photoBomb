@@ -10,10 +10,15 @@ on:
       - '!backend/Dockerfile.base'
       - '!backend/scripts/preload_models.py'
       - '.github/workflows/build-worker-image.yml'
+  workflow_run:
+    workflows: ["Build and Push Base Image"]
+    types:
+      - completed
 
 jobs:
   build-worker:
     runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
