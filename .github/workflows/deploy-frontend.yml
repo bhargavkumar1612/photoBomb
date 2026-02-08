@@ -8,6 +8,7 @@ on:
       - 'spa-worker.js'
       - 'wrangler.json'
       - '.github/workflows/deploy-frontend.yml'
+  workflow_dispatch:
 
 jobs:
   deploy:
