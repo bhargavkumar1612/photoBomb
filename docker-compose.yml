@@ -1,6 +1,7 @@
-services:
-  # FastAPI backend
-  api:
+networks:
+  default:
+    name: photobomb_app_net
+    external: false
     build:
       context: ./backend
       dockerfile: Dockerfile.backend

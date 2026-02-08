@@ -30,14 +30,15 @@ if [ ! -f .env ]; then
     echo "⚠️ Warning: .env file not found in current directory!"
 fi
 
-# Ensure network exists
-sudo docker network create photobomb_default || true
+# Ensure network exists (Compatible with Docker Compose)
+# If network doesn't exist, create it. If it exists but was created by Compose, this command is harmless.
+sudo docker network create photobomb_app_net || true
 
 sudo docker run -d \
   --name $CONTAINER_NAME \
   --env-file .env \
   -e APP_ENV=production \
-  --network photobomb_default \
+  --network photobomb_app_net \
   --restart unless-stopped \
   $IMAGE_NAME
 
