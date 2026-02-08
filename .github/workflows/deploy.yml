@@ -56,6 +56,10 @@ jobs:
             sed -i 's/ *= */=/' backend/.env
             
             # 6. Synthesize missing required variables
+            
+            # Ensure file ends with a newline
+            echo "" >> backend/.env
+            
             set -a # Automatically export sourced vars
             source backend/.env
             set +a
