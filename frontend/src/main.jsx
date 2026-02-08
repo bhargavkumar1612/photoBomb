@@ -6,7 +6,10 @@ import { GoogleOAuthProvider } from '@react-oauth/google'
 import App from './App'
 import './index.css'
 
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ""
+if (!GOOGLE_CLIENT_ID) {
+    console.error("Missing VITE_GOOGLE_CLIENT_ID environment variable!")
+}
 
 // React Query client
 const queryClient = new QueryClient({

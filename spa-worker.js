@@ -1,69 +1,37 @@
+// spa-worker.js
+// Cloudflare Worker script for Single Page Application routing
+// This ensures that all routes (like /login, /albums/123) are served the index.html
+// so that React Router can handle them client-side.
+
 export default {
     async fetch(request, env) {
-        try {
-            const url = new URL(request.url);
+        const url = new URL(request.url);
+        const { pathname } = url;
 
-            // Try to serve the request as a static asset first
-            // usage of env.ASSETS requires the "assets" binding in wrangler.json
-            if (!env.ASSETS) {
-                console.log("Environment keys:", Object.keys(env));
-                throw new Error(`env.ASSETS is undefined. Available keys: ${JSON.stringify(Object.keys(env))}. Config issue?`);
-            }
+        // Is it a request for a file (like .js, .css, .png)?
+        // If so, verify if it exists in assets. If yes, serve it.
+        // If not, fall back to index.html ONLY for navigation routes.
 
-            let response = await env.ASSETS.fetch(request);
-
-            // Clone response to add headers (responses are immutable)
-            response = new Response(response.body, response);
-
-            // Add security headers
-            response.headers.set('X-Worker-Version', '1.0.2-coop-fix');
-
-            // Critical: Allow OAuth popups to communicate with the parent window
-            // This fixes the "Cross-Origin-Opener-Policy policy would block the window.postMessage call" error
-            response.headers.set('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
-
-            // Additional security headers for best practices
-            response.headers.set('X-Content-Type-Options', 'nosniff');
-            response.headers.set('X-Frame-Options', 'SAMEORIGIN');
-            response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
-
-            // If the asset is not found (404), and it's likely a navigation request (SPA route)
-
-            // If the asset is not found (404), and it's likely a navigation request (SPA route)
-            // we should serve index.html instead.
-            if (response.status === 404) {
-                const pathname = url.pathname;
-
-                // Check if it's a request for a static asset (based on extension)
-                // We explicitly exclude these from the fallback to avoid "MIME type text/html" errors
-                // for missing scripts or images.
-                const isStaticAsset = /\.(js|css|png|jpg|jpeg|gif|ico|json|svg|woff|woff2|ttf|map|webmanifest)$/i.test(pathname);
-
-                // Check if the client explicitly accepts HTML (standard for browser navigation)
-                const acceptsHtml = request.headers.get('Accept')?.includes('text/html');
-
-                // Fallback to index.html ONLY for navigation requests that aren't API calls or static assets
-                if (!isStaticAsset && !pathname.startsWith('/api/') && !pathname.startsWith('/assets/') && acceptsHtml) {
-                    const fallbackResponse = await env.ASSETS.fetch(new URL('/index.html', request.url));
-
-                    // CRITICAL: Add headers to the fallback response too!
-                    const responseWithHeaders = new Response(fallbackResponse.body, fallbackResponse);
-                    responseWithHeaders.headers.set('X-Worker-Version', '1.0.2-coop-fix');
-                    responseWithHeaders.headers.set('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
-                    responseWithHeaders.headers.set('X-Content-Type-Options', 'nosniff');
-                    responseWithHeaders.headers.set('X-Frame-Options', 'SAMEORIGIN');
-                    responseWithHeaders.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
-
-                    return responseWithHeaders;
+        // Attempt to fetch from ASSETS binding (Cloudflare Pages automatically binds this)
+        if (env.ASSETS) {
+            try {
+                const response = await env.ASSETS.fetch(request);
+                if (response.status !== 404) {
+                    return response;
                 }
+            } catch (e) {
+                // Fall through to index.html logic
             }
-
-            return response;
-        } catch (e) {
-            return new Response(`Worker Error: ${e.message}\n${e.stack}`, {
-                status: 500,
-                headers: { "content-type": "text/plain" }
-            });
         }
+
+        // If we're here, it's a 404 or a navigation request.
+        // Serve index.html for SPA routing.
+        // Verify ASSETS binding exists first
+        if (env.ASSETS) {
+            const indexResponse = await env.ASSETS.fetch(new Request(new URL("/index.html", url), request));
+            return indexResponse;
+        }
+
+        return new Response("Not Found", { status: 404 });
     }
 };

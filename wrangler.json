@@ -1,7 +1,7 @@
 {
   "name": "photobomb",
   "compatibility_date": "2024-09-23",
-  "main": "spa-worker.js",
+  "main": "./spa-worker.js",
   "assets": {
     "directory": "./frontend/dist",
     "binding": "ASSETS"
