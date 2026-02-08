@@ -34,14 +34,23 @@ DOCUMENT_LABELS = [
 _model_cache = {}
 
 def get_document_classifier():
-    """Lazy load the classifier pipeline."""
+    """Lazy load the classifier pipeline using shared model."""
     if "doc_classifier" in _model_cache:
         return _model_cache["doc_classifier"]
 
-    logger.info("Loading CLIP model for granular document classification...")
+    logger.info("Loading CLIP model for granular document classification (Shared)...")
     try:
         from transformers import pipeline
-        classifier = pipeline("zero-shot-image-classification", model="openai/clip-vit-base-patch32")
+        from app.services.animal_detector import get_clip_model
+        
+        processor, model = get_clip_model()
+        
+        classifier = pipeline(
+            "zero-shot-image-classification", 
+            model=model, 
+            tokenizer=processor.tokenizer,
+            image_processor=processor.image_processor
+        )
         _model_cache["doc_classifier"] = classifier
         return classifier
     except ImportError as e:

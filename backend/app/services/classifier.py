@@ -20,15 +20,24 @@ CANDIDATE_LABELS = [
 ]
 
 def get_scene_classifier():
-    """Lazy load the classifier pipeline."""
+    """Lazy load the classifier pipeline using shared model."""
     if "scene_classifier" in _model_cache:
         return _model_cache["scene_classifier"]
 
-    print("Loading CLIP model for scene classification...")
+    print("Loading CLIP model for scene classification (Shared)...")
     try:
         from transformers import pipeline
-        # Use CPU by default or whatever is optimal. Transformers handles MPS/CUDA if available usually.
-        classifier = pipeline("zero-shot-image-classification", model="openai/clip-vit-base-patch32")
+        from app.services.animal_detector import get_clip_model
+        
+        processor, model = get_clip_model()
+        
+        # Pass loaded model/processor to pipeline to avoid re-loading from disk/RAM
+        classifier = pipeline(
+            "zero-shot-image-classification", 
+            model=model, 
+            tokenizer=processor.tokenizer,
+            image_processor=processor.image_processor
+        )
         _model_cache["scene_classifier"] = classifier
         return classifier
     except ImportError:

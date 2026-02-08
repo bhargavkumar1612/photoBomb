@@ -35,8 +35,6 @@ from app.models.animal import AnimalDetection
 # Global cache for models to avoid reloading on every task
 _model_cache = {
     "face_recognition": None,
-    "scene_classifier": None,
-    "scene_classifier_error": None,
     "face_recognition_error": None
 }
 
@@ -56,26 +54,7 @@ def get_face_recognition():
         _model_cache["face_recognition_error"] = e
         raise e
 
-def get_scene_classifier():
-    """Lazy load transformers pipeline"""
-    if _model_cache["scene_classifier"]:
-        return _model_cache["scene_classifier"]
 
-    if _model_cache["scene_classifier_error"]:
-        raise _model_cache["scene_classifier_error"]
-
-    try:
-        from transformers import pipeline
-        print("Loading CLIP model for scene classification... (this happens once per worker)")
-        # Check if we should use CPU explicitly to avoid MPS issues if that's the cause, 
-        # but usually defaults are fine.
-        classifier = pipeline("zero-shot-image-classification", model="openai/clip-vit-base-patch32")
-        _model_cache["scene_classifier"] = classifier
-        return classifier
-    except Exception as e:
-        print(f"Failed to load scene classifier: {e}")
-        _model_cache["scene_classifier_error"] = e
-        raise e
 
 
 
@@ -486,6 +465,7 @@ def process_photo_analysis(self, upload_id: str, photo_id: str):
                 try:
                     face_recognition = get_face_recognition()
                     from app.models.person import Face
+                    from app.models.tag import Tag, PhotoTag
                     
                     # Convert PIL Image to RGB and then to numpy array
                     with Image.open(tmp_path) as img:
@@ -591,7 +571,7 @@ def process_photo_analysis(self, upload_id: str, photo_id: str):
                 # 4d. Object & Scene Detection (CLIP)
                 from app.services.classifier import classify_image
                 from app.services.document_classifier import classify_document
-                from app.models.tag import Tag, PhotoTag
+                # Tag, PhotoTag already imported above
 
                 print(f"Classifying scene in {photo.filename}...")
                 
