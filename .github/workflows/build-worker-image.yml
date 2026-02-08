@@ -68,9 +68,15 @@ jobs:
             # Create .env file from secrets
             echo "${{ secrets.ENV_FILE }}" > .env
             
-            # Sanitize .env file (Docker doesn't like 'export' or leading spaces)
-            sed -i 's/^export //g' .env
-            sed -i 's/^[[:space:]]*//g' .env
+            # Sanitize .env file (Robust cleaning for Docker)
+            # 1. Remove 'export ' prefix (case insensitive)
+            sed -i 's/^export //I' .env
+            # 2. Remove leading/trailing whitespace
+            sed -i 's/^[[:space:]]*//;s/[[:space:]]*$//' .env
+            # 3. Filter out comments and empty lines
+            grep -vE '^\s*#' .env | grep -vE '^\s*$' > .env.clean
+            mv .env.clean .env
+            cat .env
             
             # Ensure network exists (Critical for first-time run)
             sudo docker network create photobomb_default || true
