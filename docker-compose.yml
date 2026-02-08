@@ -1,33 +1,4 @@
 services:
-  # PostgreSQL database with pgvector extension
-  postgres:
-    image: pgvector/pgvector:pg16
-    environment:
-      POSTGRES_DB: photobomb
-      POSTGRES_USER: photobomb
-      POSTGRES_PASSWORD: password
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./docs/database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U photobomb" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # Redis for Celery broker
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
-      interval: 10s
-      timeout: 3s
-      retries: 3
-
   # FastAPI backend
   api:
     build:
@@ -44,39 +15,9 @@ services:
       - B2_APPLICATION_KEY
       - B2_BUCKET_NAME
       - B2_BUCKET_ID
+      - GOOGLE_CLIENT_ID
+      - GOOGLE_CLIENT_SECRET
+      - APP_ENV
     volumes:
       - ./backend:/app
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-
-  # Celery worker for image processing
-  worker:
-    image: bhargavkumar1612/photobomb-worker:latest
-    # Pass all env vars from host (which reads .env) to container
-    environment:
-      - DATABASE_URL
-      - REDIS_URL
-      - JWT_SECRET_KEY
-      - B2_APPLICATION_KEY_ID
-      - B2_APPLICATION_KEY
-      - B2_BUCKET_NAME
-      - B2_BUCKET_ID
-    volumes:
-      - ./backend:/app
-    depends_on:
-      - postgres
-      - redis
-    command: celery -A app.celery_app worker -Q high -c 2 --loglevel=info --reload
-
-volumes:
-  postgres_data:
-
-
-networks:
-  default:
-    name: photobomb_default
-    external: true
