@@ -52,6 +52,12 @@ jobs:
             grep -vE '^\s*#' backend/.env | grep -vE '^\s*$' > backend/.env.clean
             mv backend/.env.clean backend/.env
             
+            # 5. Remove spaces around the first = (if any)
+            sed -i 's/ *= */=/' backend/.env
+            
+            echo "🔍 Debugging .env file keys (Values masked):"
+            awk -F= '{ if($1) print $1 }' backend/.env
+            
             # Restart containers
             docker compose down
             docker compose up -d --build
