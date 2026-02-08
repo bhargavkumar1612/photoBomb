@@ -7,6 +7,8 @@ from sqlalchemy.orm import declarative_base
 
 
 
+from sqlalchemy.pool import NullPool
+
 def _pgbouncer_statement_name():
     """
     Returns empty string to force usage of anonymous prepared statements.
@@ -28,18 +30,25 @@ if database_url and database_url.startswith("postgres://"):
 elif database_url and database_url.startswith("postgresql://"):
     database_url = database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
-engine = create_async_engine(
-    database_url,
-    echo=settings.DEBUG,
-    future=True,
-    pool_size=settings.DATABASE_POOL_SIZE,
-    max_overflow=settings.DATABASE_MAX_OVERFLOW,
-    pool_pre_ping=True,
-    connect_args={
+# Configure pool arguments based on settings
+engine_kwargs = {
+    "echo": settings.DEBUG,
+    "future": True,
+    "connect_args": {
         "statement_cache_size": 0,
         "prepared_statement_name_func": _pgbouncer_statement_name,
     },
-)
+}
+
+if settings.DATABASE_POOL_SIZE == 0:
+    print("DEBUG: Disabling connection pooling (NullPool)")
+    engine_kwargs["poolclass"] = NullPool
+else:
+    engine_kwargs["pool_size"] = settings.DATABASE_POOL_SIZE
+    engine_kwargs["max_overflow"] = settings.DATABASE_MAX_OVERFLOW
+    engine_kwargs["pool_pre_ping"] = True
+
+engine = create_async_engine(database_url, **engine_kwargs)
 
 # Session factory
 AsyncSessionLocal = async_sessionmaker(

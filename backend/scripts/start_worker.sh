@@ -11,4 +11,5 @@ SERVER_PID=$!
 # The dummy server is just a sidecar.
 echo "👷 Starting Celery Worker..."
 # Concurrency 1 and no-gossip/no-mingle to save memory
+export DATABASE_POOL_SIZE=0
 exec celery -A app.celery_app worker -Q high,low -c 1 --loglevel=info --without-gossip --without-mingle
