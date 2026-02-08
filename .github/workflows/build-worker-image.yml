@@ -82,6 +82,17 @@ jobs:
             # 5. Remove spaces around the first = (if any)
             sed -i 's/ *= */=/' .env
             
+            # 6. Synthesize missing required variables (DATABASE_URL, JWT_SECRET_KEY)
+            source .env
+            if [ -z "$DATABASE_URL" ] && [ -n "$DB_HOST" ]; then
+              echo "🔧 Constructing DATABASE_URL..."
+              echo "DATABASE_URL=postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_DATABASE}" >> .env
+            fi
+            if [ -z "$JWT_SECRET_KEY" ] && [ -n "$JWT_SECRET" ]; then
+              echo "🔧 Mapping JWT_SECRET -> JWT_SECRET_KEY..."
+              echo "JWT_SECRET_KEY=${JWT_SECRET}" >> .env
+            fi
+            
             echo "🔍 Debugging .env file keys (Values masked):"
             awk -F= '{ if($1) print $1 }' .env
             
