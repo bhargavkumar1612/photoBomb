@@ -37,14 +37,15 @@ services:
       dockerfile: Dockerfile.backend
     ports:
       - "8000:8000"
+    # Pass all env vars from host (which reads .env) to container
     environment:
-      - DATABASE_URL=postgresql+asyncpg://photobomb:password@postgres:5432/photobomb
-      - REDIS_URL=redis://redis:6379/0
-      - JWT_SECRET_KEY=dev-secret-key-change-in-production
-      - B2_APPLICATION_KEY_ID=your_key_id_here
-      - B2_APPLICATION_KEY=your_key_here
-      - B2_BUCKET_NAME=photobomb-dev
-      - B2_BUCKET_ID=your_bucket_id
+      - DATABASE_URL
+      - REDIS_URL
+      - JWT_SECRET_KEY
+      - B2_APPLICATION_KEY_ID
+      - B2_APPLICATION_KEY
+      - B2_BUCKET_NAME
+      - B2_BUCKET_ID
     volumes:
       - ./backend:/app
     depends_on:
@@ -56,16 +57,14 @@ services:
 
   # Celery worker for image processing
   worker:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile.worker # Uses heavy AI image
+    # Pass all env vars from host (which reads .env) to container
     environment:
-      - DATABASE_URL=postgresql+asyncpg://photobomb:password@postgres:5432/photobomb
-      - REDIS_URL=redis://redis:6379/0
-      - B2_APPLICATION_KEY_ID=your_key_id_here
-      - B2_APPLICATION_KEY=your_key_here
-      - B2_BUCKET_NAME=photobomb-dev
-      - B2_BUCKET_ID=your_bucket_id
+      - REDIS_URL
+      - JWT_SECRET_KEY
+      - B2_APPLICATION_KEY_ID
+      - B2_APPLICATION_KEY
+      - B2_BUCKET_NAME
+      - B2_BUCKET_ID
     volumes:
       - ./backend:/app
     depends_on:

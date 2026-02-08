@@ -1,4 +1,4 @@
-name: Deploy to Production
+name: Deploy Backend
 
 on:
   push:
@@ -43,36 +43,52 @@ jobs:
             cd /opt/photobomb
             
             # Create .env file from secrets
-            echo "${{ secrets.ENV_FILE }}" > backend/.env
+            # Create .env file from secrets
+            echo "${{ secrets.ENV_FILE }}" > .env
             
             # Sanitize .env file (Robust cleaning for Docker)
-            tr -d '\r' < backend/.env > backend/.env.tmp && mv backend/.env.tmp backend/.env
-            sed -i 's/^export //I' backend/.env
-            sed -i 's/^[[:space:]]*//;s/[[:space:]]*$//' backend/.env
-            grep -vE '^\s*#' backend/.env | grep -vE '^\s*$' > backend/.env.clean
-            mv backend/.env.clean backend/.env
+            tr -d '\r' < .env > .env.tmp && mv .env.tmp .env
+            sed -i 's/^export //I' .env
+            sed -i 's/^[[:space:]]*//;s/[[:space:]]*$//' .env
+            grep -vE '^\s*#' .env | grep -vE '^\s*$' > .env.clean
+            mv .env.clean .env
             
             # 5. Remove spaces around the first = (if any)
-            sed -i 's/ *= */=/' backend/.env
+            sed -i 's/ *= */=/' .env
             
-            # 6. Synthesize missing required variables
+            # 6. Synthesize missing required variables (Safety checks)
             
-            # Ensure file ends with a newline
-            echo "" >> backend/.env
+            # Ensure file ends with a newline before appending anything
+            echo "" >> .env
             
-            set -a # Automatically export sourced vars
-            source backend/.env
+            # Remove existing lines to simply overwrite/avoid duplicates
+            sed -i '/^DATABASE_URL=/d' .env
+            sed -i '/^JWT_SECRET_KEY=/d' .env
+            
+            # Source to see what we have
+            set -a
+            source .env
             set +a
             
             if [ -z "$DATABASE_URL" ] && [ -n "$DB_HOST" ]; then
-              echo "DATABASE_URL=postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_DATABASE}" >> backend/.env
+              echo "🔧 Constructing DATABASE_URL (Missing in secret)..."
+              echo "DATABASE_URL=postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_DATABASE}" >> .env
             fi
+            
             if [ -z "$JWT_SECRET_KEY" ] && [ -n "$JWT_SECRET" ]; then
-              echo "JWT_SECRET_KEY=${JWT_SECRET}" >> backend/.env
+              echo "🔧 Mapping JWT_SECRET -> JWT_SECRET_KEY..."
+              echo "JWT_SECRET_KEY=${JWT_SECRET}" >> .env
+            fi
+            
+            # Explicit Verification
+            if grep -q "REDIS_URL" .env; then
+              echo "✅ REDIS_URL found in .env"
+            else
+              echo "❌ REDIS_URL NOT FOUND in .env! Check GitHub Secrets 'ENV_FILE'."
             fi
             
             echo "🔍 Debugging .env file keys (Values masked):"
-            awk -F= '{ if($1) print $1 }' backend/.env
+            awk -F= '{ if($1) print $1 }' .env
             
             # Restart containers
             docker compose down
