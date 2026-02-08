@@ -69,13 +69,17 @@ jobs:
             echo "${{ secrets.ENV_FILE }}" > .env
             
             # Sanitize .env file (Robust cleaning for Docker)
-            # 1. Remove 'export ' prefix (case insensitive)
+            # 1. Remove carriage returns (Windows compat)
+            tr -d '\r' < .env > .env.tmp && mv .env.tmp .env
+            # 2. Remove 'export ' prefix (case insensitive)
             sed -i 's/^export //I' .env
-            # 2. Remove leading/trailing whitespace
+            # 3. Remove leading/trailing whitespace
             sed -i 's/^[[:space:]]*//;s/[[:space:]]*$//' .env
-            # 3. Filter out comments and empty lines
+            # 4. Filter out comments and empty lines
             grep -vE '^\s*#' .env | grep -vE '^\s*$' > .env.clean
             mv .env.clean .env
+            
+            echo "🔍 Debugging .env content (masked):"
             cat .env
             
             # Ensure network exists (Critical for first-time run)

@@ -46,11 +46,11 @@ jobs:
             echo "${{ secrets.ENV_FILE }}" > backend/.env
             
             # Sanitize .env file (Robust cleaning for Docker)
+            tr -d '\r' < backend/.env > backend/.env.tmp && mv backend/.env.tmp backend/.env
             sed -i 's/^export //I' backend/.env
             sed -i 's/^[[:space:]]*//;s/[[:space:]]*$//' backend/.env
             grep -vE '^\s*#' backend/.env | grep -vE '^\s*$' > backend/.env.clean
             mv backend/.env.clean backend/.env
-            cat backend/.env
             
             # Restart containers
             docker compose down
