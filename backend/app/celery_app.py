@@ -54,6 +54,7 @@ celery_app.conf.imports = [
     'app.workers.thumbnail_worker',
     'app.workers.db_keepalive_worker',
     'app.workers.face_worker',
+    'app.workers.model_loader',
 ]
 
 from celery.schedules import crontab

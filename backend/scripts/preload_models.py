@@ -16,12 +16,12 @@ try:
     from transformers import CLIPModel, CLIPProcessor, DetrImageProcessor, DetrForObjectDetection
     
     print("Downloading CLIP model (openai/clip-vit-base-patch32)...")
-    CLIPModel.from_pretrained("openai/clip-vit-base-patch32", cache_dir=cache_dir)
-    CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32", cache_dir=cache_dir)
+    CLIPModel.from_pretrained("openai/clip-vit-base-patch32", cache_dir=cache_dir, use_safetensors=False)
+    CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32", cache_dir=cache_dir, use_safetensors=False)
     
     print("Downloading DETR model (facebook/detr-resnet-50)...")
-    DetrImageProcessor.from_pretrained("facebook/detr-resnet-50", cache_dir=cache_dir)
-    DetrForObjectDetection.from_pretrained("facebook/detr-resnet-50", cache_dir=cache_dir)
+    DetrImageProcessor.from_pretrained("facebook/detr-resnet-50", cache_dir=cache_dir, use_safetensors=False)
+    DetrForObjectDetection.from_pretrained("facebook/detr-resnet-50", cache_dir=cache_dir, use_safetensors=False)
 
     # 2. Face Recognition Models (dlib)
     # These are usually downloaded by face_recognition at runtime to ~/.face_recognition_models

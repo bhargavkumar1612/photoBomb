@@ -15,6 +15,10 @@ COPY requirements.backend.txt .
 COPY requirements.worker.txt .
 RUN pip install --no-cache-dir -r requirements.worker.txt
 
+# Set HuggingFace cache directory (match base image path to avoid duplication)
+ENV HF_HOME=/home/appuser/model_cache
+RUN mkdir -p $HF_HOME
+
 # Copy app code
 COPY --chown=appuser:appuser . .
 

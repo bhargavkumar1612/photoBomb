@@ -15,7 +15,7 @@ def get_detr_model():
     if _detr_model is None:
         logger.info("Loading DETR model for animal detection...")
         from transformers import DetrImageProcessor, DetrForObjectDetection
-        _detr_processor = DetrImageProcessor.from_pretrained("facebook/detr-resnet-50")
+        _detr_processor = DetrImageProcessor.from_pretrained("facebook/detr-resnet-50", use_safetensors=False)
         _detr_model = DetrForObjectDetection.from_pretrained("facebook/detr-resnet-50", use_safetensors=False)
     return _detr_processor, _detr_model
 
@@ -24,8 +24,8 @@ def get_clip_model():
     if _clip_model is None:
         logger.info("Loading CLIP model for animal embeddings...")
         from transformers import CLIPProcessor, CLIPModel
-        _clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
-        _clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+        _clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32", use_safetensors=False)
+        _clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32", use_safetensors=False)
     return _clip_processor, _clip_model
 
 ANIMAL_LABELS = {
