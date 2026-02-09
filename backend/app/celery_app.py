@@ -24,11 +24,11 @@ celery_app = Celery(
 
 # Configure transport options for stability
 celery_app.conf.broker_transport_options = {
-    'visibility_timeout': 3600,  # 1 hour
-    'socket_timeout': 60,       # 60 seconds
-    'socket_connect_timeout': 60,
+    'visibility_timeout': 7200,  # 2 hours
+    'socket_timeout': 600,       # 10 minutes (to allow for slow model downloads)
+    'socket_connect_timeout': 600,
     'socket_keepalive': True,
-    'health_check_interval': 10,
+    'health_check_interval': 30,
 }
 
 # Configuration

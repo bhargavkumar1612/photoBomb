@@ -42,6 +42,7 @@ pytesseract==0.3.10
 # Dependencies moved to requirements-base.txt:
 # - numpy, scikit-learn, face_recognition
 # - transformers, torch, torchvision
+safetensors
 
 # --- Task Queue ---
 celery==5.3.6

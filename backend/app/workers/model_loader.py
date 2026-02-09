@@ -23,3 +23,8 @@ def preload_models(**kwargs):
         
     except Exception as e:
         logger.error(f"❌ Failed to preload models: {e}")
+
+if __name__ == "__main__":
+    # Allow running this script directly to pre-cache models during build
+    logging.basicConfig(level=logging.INFO)
+    preload_models()
