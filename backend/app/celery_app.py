@@ -44,7 +44,7 @@ celery_app.conf.update(
         'app.workers.face_worker.*': {'queue': 'low'},
         'app.workers.db_keepalive_worker.*': {'queue': 'low'},
     },
-    task_acks_late=True,
+    task_acks_late=False,  # Ack immediately to avoid Redis timeout issues
     worker_prefetch_multiplier=1,
 )
 
