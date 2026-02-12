@@ -38,6 +38,7 @@ celery_app.conf.update(
     result_serializer='json',
     timezone='UTC',
     enable_utc=True,
+    task_ignore_result=True,  # Fire-and-forget: don't store results in Redis
     task_routes={
         'app.workers.thumbnail_worker.*': {'queue': 'high'},
         'app.workers.face_worker.*': {'queue': 'low'},
