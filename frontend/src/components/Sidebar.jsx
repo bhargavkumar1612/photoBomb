@@ -14,10 +14,13 @@ import {
     Mountain
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useFeatures } from '../context/FeaturesContext';
 import './Sidebar.css';
 
 export default function Sidebar({ isOpen, onClose }) {
     const { user } = useAuth();
+    const { animal_detection_enabled } = useFeatures();
+
     const navItems = [
         { path: '/', icon: <Image size={20} />, label: 'Photos' },
         { path: '/explore', icon: <Search size={20} />, label: 'Explore' },
@@ -25,7 +28,7 @@ export default function Sidebar({ isOpen, onClose }) {
         { path: '/albums', icon: <FolderHeart size={20} />, label: 'Albums' },
         { path: '/places', icon: <MapPin size={20} />, label: 'Places' },
         { path: '/people', icon: <Users size={20} />, label: 'People' },
-        { path: '/animals', icon: <PawPrint size={20} />, label: 'Animals' },
+        ...(animal_detection_enabled ? [{ path: '/animals', icon: <PawPrint size={20} />, label: 'Animals' }] : []),
         { path: '/hashtags', icon: <Hash size={20} />, label: 'Hashtags' },
         { path: '/trash', icon: <Trash2 size={20} />, label: 'Trash' },
     ];

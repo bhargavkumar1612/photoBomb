@@ -54,6 +54,9 @@ class Settings(BaseSettings):
     FACE_RECOGNITION_ENABLED: bool = True
     FACE_MODEL_PATH: str = "./models/arcface_r100_v1.onnx"
     
+    # Animal Detection (Disabled by default due to memory usage)
+    ANIMAL_DETECTION_ENABLED: bool = False
+    
     # OAuth (optional)
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""

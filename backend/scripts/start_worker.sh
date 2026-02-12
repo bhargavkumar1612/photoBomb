@@ -16,4 +16,8 @@ python3 -m app.workers.model_loader || echo "⚠️ Model preload failed, worker
 
 # Concurrency 1 and no-gossip/no-mingle to save memory
 export DATABASE_POOL_SIZE=0
+# Aggressively release memory back to OS
+export MALLOC_TRIM_THRESHOLD_=65536
+export PYTHONMALLOC=malloc
+
 exec celery -A app.celery_app worker -Q high,low -c 1 --loglevel=info --without-gossip --without-mingle

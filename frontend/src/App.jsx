@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { SearchProvider } from './context/SearchContext'
+import { FeaturesProvider, useFeatures } from './context/FeaturesContext'
 import AppLayout from './layouts/AppLayout'
 import Login from './pages/Login'
 import Register from './pages/Register'
@@ -69,6 +70,21 @@ function AdminRoute({ children }) {
     return children
 }
 
+function ConditionalAnimalRoutes() {
+    const { animal_detection_enabled, loading } = useFeatures()
+
+    if (loading) return null
+
+    if (!animal_detection_enabled) return null
+
+    return (
+        <>
+            <Route path="/animals" element={<AnimalsPage />} />
+            <Route path="/animals/:id" element={<AnimalDetailPage />} />
+        </>
+    )
+}
+
 function App() {
     useEffect(() => {
         // Keep-Alive Heartbeat for Render (every 10 mins)
@@ -82,56 +98,57 @@ function App() {
 
     return (
         <AuthProvider>
-            <SearchProvider>
-                <div className="app-container">
-                    <Routes>
-                        <Route path="/login" element={
-                            <PublicOnlyRoute>
-                                <Login />
-                            </PublicOnlyRoute>
-                        } />
-                        <Route path="/register" element={
-                            <PublicOnlyRoute>
-                                <Register />
-                            </PublicOnlyRoute>
-                        } />
-
-                        <Route element={
-                            <ProtectedRoute>
-                                <AppLayout />
-                            </ProtectedRoute>
-                        }>
-                            <Route path="/" element={<Timeline />} />
-                            <Route path="/explore" element={<PlaceholderPage title="Explore" />} />
-                            <Route path="/sharing" element={<Sharing />} />
-                            <Route path="/albums" element={<Albums />} />
-                            <Route path="/albums/:albumId" element={<AlbumDetail />} />
-                            <Route path="/shared/:token" element={<SharedAlbumView />} />
-                            <Route path="/people" element={<PeoplePage />} />
-                            <Route path="/people/:id" element={<PersonDetailPage />} />
-                            <Route path="/places" element={<MapPage />} />
-                            <Route path="/animals" element={<AnimalsPage />} />
-                            <Route path="/animals/:id" element={<AnimalDetailPage />} />
-                            <Route path="/hashtags" element={<HashtagsPage />} />
-                            <Route path="/hashtags/tag/:tagId" element={<HashtagDetailPage />} />
-                            <Route path="/favorites" element={<Timeline favoritesOnly={true} />} />
-                            <Route path="/trash" element={<Trash />} />
-                            <Route path="/settings" element={<Settings />} />
-                            <Route path="/upload" element={<Upload />} />
-                            <Route path="/admin" element={
-                                <AdminRoute>
-                                    <AdminDashboard />
-                                </AdminRoute>
+            <FeaturesProvider>
+                <SearchProvider>
+                    <div className="app-container">
+                        <Routes>
+                            <Route path="/login" element={
+                                <PublicOnlyRoute>
+                                    <Login />
+                                </PublicOnlyRoute>
                             } />
-                        </Route>
+                            <Route path="/register" element={
+                                <PublicOnlyRoute>
+                                    <Register />
+                                </PublicOnlyRoute>
+                            } />
 
-                        {/* Catch all - redirect to home (which is protected, so will redirect to login if needed) */}
-                        <Route path="*" element={<Navigate to="/" replace />} />
-                    </Routes>
+                            <Route element={
+                                <ProtectedRoute>
+                                    <AppLayout />
+                                </ProtectedRoute>
+                            }>
+                                <Route path="/" element={<Timeline />} />
+                                <Route path="/explore" element={<PlaceholderPage title="Explore" />} />
+                                <Route path="/sharing" element={<Sharing />} />
+                                <Route path="/albums" element={<Albums />} />
+                                <Route path="/albums/:albumId" element={<AlbumDetail />} />
+                                <Route path="/shared/:token" element={<SharedAlbumView />} />
+                                <Route path="/people" element={<PeoplePage />} />
+                                <Route path="/people/:id" element={<PersonDetailPage />} />
+                                <Route path="/places" element={<MapPage />} />
+                                <ConditionalAnimalRoutes />
+                                <Route path="/hashtags" element={<HashtagsPage />} />
+                                <Route path="/hashtags/tag/:tagId" element={<HashtagDetailPage />} />
+                                <Route path="/favorites" element={<Timeline favoritesOnly={true} />} />
+                                <Route path="/trash" element={<Trash />} />
+                                <Route path="/settings" element={<Settings />} />
+                                <Route path="/upload" element={<Upload />} />
+                                <Route path="/admin" element={
+                                    <AdminRoute>
+                                        <AdminDashboard />
+                                    </AdminRoute>
+                                } />
+                            </Route>
 
-                    <UploadProgressWidget />
-                </div>
-            </SearchProvider>
+                            {/* Catch all - redirect to home (which is protected, so will redirect to login if needed) */}
+                            <Route path="*" element={<Navigate to="/" replace />} />
+                        </Routes>
+
+                        <UploadProgressWidget />
+                    </div>
+                </SearchProvider>
+            </FeaturesProvider>
         </AuthProvider>
     )
 }

@@ -1,6 +1,7 @@
 import logging
 from celery.signals import worker_process_init
-from app.services.animal_detector import get_detr_model, get_clip_model
+from app.services.clip_model import get_clip_model
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -13,11 +14,15 @@ def preload_models(**kwargs):
     logger.info("⚡ Preloading AI models into memory...")
     
     try:
-        # Load DETR (Object Detection)
-        get_detr_model()
-        logger.info("✅ DETR model loaded.")
+        # Load DETR (Object Detection) only if animal detection is enabled
+        if settings.ANIMAL_DETECTION_ENABLED:
+            from app.services.animal_detector import get_detr_model
+            get_detr_model()
+            logger.info("✅ DETR model loaded.")
+        else:
+            logger.info("⏭️  Skipping DETR model (ANIMAL_DETECTION_ENABLED=False)")
         
-        # Load CLIP (Embeddings)
+        # Load CLIP (Embeddings) - always needed for scene/doc classification
         get_clip_model()
         logger.info("✅ CLIP model loaded.")
         

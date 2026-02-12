@@ -27,7 +27,7 @@ def get_scene_classifier():
     print("Loading CLIP model for scene classification (Shared)...")
     try:
         from transformers import pipeline
-        from app.services.animal_detector import get_clip_model
+        from app.services.clip_model import get_clip_model
         
         processor, model = get_clip_model()
         

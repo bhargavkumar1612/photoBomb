@@ -41,7 +41,7 @@ def get_document_classifier():
     logger.info("Loading CLIP model for granular document classification (Shared)...")
     try:
         from transformers import pipeline
-        from app.services.animal_detector import get_clip_model
+        from app.services.clip_model import get_clip_model
         
         processor, model = get_clip_model()
         

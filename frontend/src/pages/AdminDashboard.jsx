@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { useFeatures } from '../context/FeaturesContext'
 import api from '../services/api'
 import './AdminDashboard.css'
 
 export default function AdminDashboard() {
     const { user } = useAuth()
+    const { animal_detection_enabled } = useFeatures()
     const [scopes, setScopes] = useState({
         faces: true,
         animals: false,
@@ -129,17 +131,19 @@ export default function AdminDashboard() {
                             </div>
                         </label>
 
-                        <label className="checkbox-row">
-                            <input
-                                type="checkbox"
-                                checked={scopes.animals}
-                                onChange={e => setScopes({ ...scopes, animals: e.target.checked })}
-                            />
-                            <div className="label-text">
-                                <strong>Animal Detection</strong>
-                                <span>Group detected animals by species</span>
-                            </div>
-                        </label>
+                        {animal_detection_enabled && (
+                            <label className="checkbox-row">
+                                <input
+                                    type="checkbox"
+                                    checked={scopes.animals}
+                                    onChange={e => setScopes({ ...scopes, animals: e.target.checked })}
+                                />
+                                <div className="label-text">
+                                    <strong>Animal Detection</strong>
+                                    <span>Group detected animals by species</span>
+                                </div>
+                            </label>
+                        )}
 
                         <label className="checkbox-row">
                             <input

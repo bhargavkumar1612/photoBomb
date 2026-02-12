@@ -29,8 +29,12 @@ from sqlalchemy import select
 from app.models.photo import Photo
 from app.core.database import AsyncSessionLocal
 import numpy as np
-from app.services.animal_detector import detect_animals, get_animal_embedding
-from app.models.animal import AnimalDetection
+
+# Conditional imports for animal detection
+if settings.ANIMAL_DETECTION_ENABLED:
+    from app.services.animal_detector import detect_animals, get_animal_embedding
+    from app.models.animal import AnimalDetection
+
 
 # Global cache for models to avoid reloading on every task
 _model_cache = {
@@ -508,63 +512,68 @@ def process_photo_analysis(self, upload_id: str, photo_id: str):
                 except Exception as e:
                     print(f"Error in face recognition: {e}")
 
-                # 4d. Animal Detection (DETR + CLIP)
-                try:
-                    print(f"Detecting animals in {photo.filename}...")
-                    detections = detect_animals(tmp_path, threshold=0.7)
-                    print(f"Found {len(detections)} animals")
-                    
-                    for det in detections:
-                        # DETR box: [xmin, ymin, xmax, ymax]
-                        # Convert to (top, right, bottom, left) for save_crop
-                        xmin, ymin, xmax, ymax = det['box']
-                        box = (int(ymin), int(xmax), int(ymax), int(xmin))
+                # 4d. Animal Detection (DETR + CLIP) - Only if enabled
+                if settings.ANIMAL_DETECTION_ENABLED:
+                    try:
+                        from app.models.tag import Tag, PhotoTag
+                        print(f"Detecting animals in {photo.filename}...")
+                        detections = detect_animals(tmp_path, threshold=0.7)
+                        print(f"Found {len(detections)} animals")
                         
-                        embedding = get_animal_embedding(tmp_path, det['box'])
-                        
-                        new_det = AnimalDetection(
-                            photo_id=photo.photo_id,
-                            label=det['label'],
-                            confidence=det['confidence'],
-                            embedding=embedding,
-                            location_top=box[0],
-                            location_right=box[1],
-                            location_bottom=box[2],
-                            location_left=box[3]
-                        )
-                        db.add(new_det)
-                        await db.flush()
-                        
-                        # Save animal crop
-                        animal_key = f"{settings.STORAGE_PATH_PREFIX}/{photo.user_id}/animals/crops/{new_det.detection_id}.jpg"
-                        save_crop(storage, tmp_path, box, animal_key, padding=0.1)
+                        for det in detections:
+                            # DETR box: [xmin, ymin, xmax, ymax]
+                            # Convert to (top, right, bottom, left) for save_crop
+                            xmin, ymin, xmax, ymax = det['box']
+                            box = (int(ymin), int(xmax), int(ymax), int(xmin))
+                            
+                            embedding = get_animal_embedding(tmp_path, det['box'])
+                            
+                            new_det = AnimalDetection(
+                                photo_id=photo.photo_id,
+                                label=det['label'],
+                                confidence=det['confidence'],
+                                embedding=embedding,
+                                location_top=box[0],
+                                location_right=box[1],
+                                location_bottom=box[2],
+                                location_left=box[3]
+                            )
+                            db.add(new_det)
+                            await db.flush()
+                            
+                            # Save animal crop
+                            animal_key = f"{settings.STORAGE_PATH_PREFIX}/{photo.user_id}/animals/crops/{new_det.detection_id}.jpg"
+                            save_crop(storage, tmp_path, box, animal_key, padding=0.1)
 
-                        # 2. ALSO ADD AS TAG (Special request for #dog search)
-                        animal_tag_name = det['label'].lower().replace(" ", "")
-                        tag_stmt = await db.execute(select(Tag).where(Tag.name == animal_tag_name))
-                        animal_tag = tag_stmt.scalar_one_or_none()
-                        
-                        if not animal_tag:
-                            try:
-                                animal_tag = Tag(name=animal_tag_name, category="animals")
-                                db.add(animal_tag)
-                                await db.flush()
-                            except Exception:
-                                # Race condition
-                                await db.rollback()
-                                tag_stmt = await db.execute(select(Tag).where(Tag.name == animal_tag_name))
-                                animal_tag = tag_stmt.scalar_one()
+                            # 2. ALSO ADD AS TAG (Special request for #dog search)
+                            animal_tag_name = det['label'].lower().replace(" ", "")
+                            tag_stmt = await db.execute(select(Tag).where(Tag.name == animal_tag_name))
+                            animal_tag = tag_stmt.scalar_one_or_none()
+                            
+                            if not animal_tag:
+                                try:
+                                    animal_tag = Tag(name=animal_tag_name, category="animals")
+                                    db.add(animal_tag)
+                                    await db.flush()
+                                except Exception:
+                                    # Race condition
+                                    await db.rollback()
+                                    tag_stmt = await db.execute(select(Tag).where(Tag.name == animal_tag_name))
+                                    animal_tag = tag_stmt.scalar_one()
 
-                        # Link photo to tag if not exists
-                        link_res = await db.execute(select(PhotoTag).where(
-                            PhotoTag.photo_id == photo.photo_id,
-                            PhotoTag.tag_id == animal_tag.tag_id
-                        ))
-                        if not link_res.scalar_one_or_none():
-                            pt = PhotoTag(photo_id=photo.photo_id, tag_id=animal_tag.tag_id, confidence=det['confidence'])
-                            db.add(pt)
-                except Exception as e:
-                    print(f"Error in animal detection: {e}")
+                            # Link photo to tag if not exists
+                            link_res = await db.execute(select(PhotoTag).where(
+                                PhotoTag.photo_id == photo.photo_id,
+                                PhotoTag.tag_id == animal_tag.tag_id
+                            ))
+                            if not link_res.scalar_one_or_none():
+                                pt = PhotoTag(photo_id=photo.photo_id, tag_id=animal_tag.tag_id, confidence=det['confidence'])
+                                db.add(pt)
+                    except Exception as e:
+                        print(f"Error in animal detection: {e}")
+                else:
+                    print(f"⏭️  Skipping animal detection (ANIMAL_DETECTION_ENABLED=False)")
+
 
                 # 4e. Object & Scene Detection (CLIP)
                 # 4d. Object & Scene Detection (CLIP)

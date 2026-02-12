@@ -9,4 +9,5 @@ from app.models.person import Person, Face
 from app.models.tag import Tag, PhotoTag
 from app.models.animal import Animal, AnimalDetection
 
+
 __all__ = ["User", "Photo", "PhotoFile", "Album", "ShareLink", "SharedPhoto", "Person", "Face", "Tag", "PhotoTag", "Animal", "AnimalDetection"]

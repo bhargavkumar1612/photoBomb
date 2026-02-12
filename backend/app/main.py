@@ -77,6 +77,15 @@ async def root():
     }
 
 
+@app.get("/api/v1/config/features")
+async def get_features():
+    """Get feature flags configuration."""
+    return {
+        "animal_detection_enabled": settings.ANIMAL_DETECTION_ENABLED,
+        "face_recognition_enabled": settings.FACE_RECOGNITION_ENABLED
+    }
+
+
 @app.get("/healthz")
 async def health_check():
     """Health check endpoint for monitoring."""
