@@ -203,9 +203,9 @@ async def process_clustering_job(job_id: uuid.UUID, request: ClusterRequest):
     We need to create a new session generator here.
     """
     # Re-import to avoid circular dependency if needed, or use the global SessionLocal like get_db does
-    from app.core.database import async_session_factory
+    from app.core.database import AsyncSessionLocal
     
-    async with async_session_factory() as session:
+    async with AsyncSessionLocal() as session:
         print(f"🔄 BackgroundTask started for job {job_id}, scopes={request.scopes}", flush=True)
         try:
              # Fetch job again to update it
