@@ -129,101 +129,140 @@ async def trigger_admin_clustering(
     await db.commit()
     await db.refresh(job)
 
-    results = []
+    # Offload to background task
+    background_tasks.add_task(
+        process_clustering_job,
+        job.job_id,
+        request,
+        db 
+    )
 
-    for user_id in request.target_user_ids:
-        user_msg = []
-        
-        # Verify target user exists
-        result = await db.execute(select(User).where(User.user_id == user_id))
-        target_user = result.scalar_one_or_none()
-        if not target_user:
-            results.append(f"User {user_id}: Not Found")
-            continue
+    return {"status": "queued", "job_id": str(job.job_id), "message": "Job queued in background"}
 
-        prefix = f"User {target_user.email}:"
+async def process_clustering_job(job_id: uuid.UUID, request: ClusterRequest, db: AsyncSession):
+    """
+    Background task to handle the actual clustering logic.
+    Note: We need a new session or careful management if db is passed.
+    Actually, FastAPI dependency injection for 'db' closes the session after request.
+    So we might need to handle session within this function if we can't reuse the request one safely.
+    For simplicity in this refactor, we'll try to use the passed session but ideally we should create a new one.
+    However, since we are in async context, let's keep it simple first. 
+    Actually, safe way is to pass the logic to a service function that manages its own transaction or assumes one.
+    But to avoid 'Session is closed' errors, we should be careful.
+    
+    Correction: The 'db' session from Depends(get_db) is closed after the response is sent.
+    We CANNOT use it in background_tasks.
+    We need to create a new session generator here.
+    """
+    # Re-import to avoid circular dependency if needed, or use the global SessionLocal like get_db does
+    from app.core.database import async_session_factory
+    
+    async with async_session_factory() as session:
+        try:
+             # Fetch job again to update it
+            result = await session.execute(select(AdminJob).where(AdminJob.job_id == job_id))
+            job = result.scalar_one_or_none()
+            if not job:
+                return
 
-        # 1. Faces
-        if "faces" in request.scopes:
-            if request.force_reset:
-                # Delete all persons for user (Faces will be set to NULL via CASCADE SET NULL)
-                await db.execute(delete(Person).where(Person.user_id == user_id))
-                await db.commit() # Commit deletion before clustering
-                user_msg.append("Faces reset")
+            results = []
             
-            # background_tasks.add_task(cluster_faces, user_id)
-            from app.celery_app import celery_app
-            celery_app.send_task('app.workers.face_worker.cluster_faces', args=[str(user_id)])
-            user_msg.append("Face clustering queued")
+            for user_id in request.target_user_ids:
+                user_msg = []
+                # Verify target user exists
+                result = await session.execute(select(User).where(User.user_id == user_id))
+                target_user = result.scalar_one_or_none()
+                if not target_user:
+                    results.append(f"User {user_id}: Not Found")
+                    continue
 
-        # 2. Animals
-        if "animals" in request.scopes:
-            # animal clustering service handles reset logic internally
-            # background_tasks.add_task(cluster_animals, user_id, force_reset=request.force_reset)
-            from app.celery_app import celery_app
-            celery_app.send_task(
-                'app.workers.face_worker.cluster_animals',
-                args=[str(user_id)],
-                kwargs={'force_reset': request.force_reset}
-            )
-            user_msg.append("Animal clustering queued")
+                prefix = f"User {target_user.email}:"
 
-        # 3. Hashtags (Re-scan)
-        if "hashtags" in request.scopes:
-            if request.force_reset:
-                # Mark all photos as unprocessed
-                await db.execute(
-                    update(Photo)
-                    .where(Photo.user_id == user_id)
-                    .values(processed_at=None)
-                )
-                await db.commit()
-                
-                # Helper to send tasks
-                from app.celery_app import celery_app
-                
-                # Fetch all photos to queue
-                result = await db.execute(select(Photo).where(Photo.user_id == user_id))
-                photos = result.scalars().all()
-                
-                count = 0
-                for photo in photos:
-                     celery_app.send_task(
-                        'app.workers.thumbnail_worker.process_photo_analysis',
-                        args=[str(photo.photo_id), str(photo.photo_id)]
-                    )
-                     count += 1
-                user_msg.append(f"Rescan triggered for {count} photos")
-            else:
-                # Just retry unprocessed ones
-                result = await db.execute(
-                    select(Photo).where(
-                        Photo.user_id == user_id,
-                        Photo.deleted_at == None,
-                        Photo.processed_at == None
-                    )
-                )
-                photos = result.scalars().all()
-                if photos:
+                # 1. Faces
+                if "faces" in request.scopes:
+                    if request.force_reset:
+                        # Delete all persons for user (Faces will be set to NULL via CASCADE SET NULL)
+                        await session.execute(delete(Person).where(Person.user_id == user_id))
+                        await session.commit()
+                        user_msg.append("Faces reset")
+                    
                     from app.celery_app import celery_app
-                    count = 0
-                    for photo in photos:
-                        celery_app.send_task(
-                            'app.workers.thumbnail_worker.process_photo_analysis',
-                            args=[str(photo.photo_id), str(photo.photo_id)]
+                    celery_app.send_task('app.workers.face_worker.cluster_faces', args=[str(user_id)])
+                    user_msg.append("Face clustering queued")
+
+                # 2. Animals
+                if "animals" in request.scopes:
+                    # animal clustering service handles reset logic internally
+                    from app.celery_app import celery_app
+                    celery_app.send_task(
+                        'app.workers.face_worker.cluster_animals',
+                        args=[str(user_id)],
+                        kwargs={'force_reset': request.force_reset}
+                    )
+                    user_msg.append("Animal clustering queued")
+
+                # 3. Hashtags (Re-scan)
+                if "hashtags" in request.scopes:
+                    if request.force_reset:
+                        # Mark all photos as unprocessed
+                        await session.execute(
+                            update(Photo)
+                            .where(Photo.user_id == user_id)
+                            .values(processed_at=None)
                         )
-                        count += 1
-                    user_msg.append(f"Retrying analysis for {count} unprocessed photos")
-        
-        if user_msg:
-             results.append(f"{prefix} {', '.join(user_msg)}")
-        else:
-             results.append(f"{prefix} No scopes selected")
+                        await session.commit()
+                        
+                        from app.celery_app import celery_app
+                        # Fetch all photos to queue
+                        result = await session.execute(select(Photo).where(Photo.user_id == user_id))
+                        photos = result.scalars().all()
+                        
+                        count = 0
+                        for photo in photos:
+                             celery_app.send_task(
+                                'app.workers.thumbnail_worker.process_photo_analysis',
+                                args=[str(photo.photo_id), str(photo.photo_id)]
+                            )
+                             count += 1
+                        user_msg.append(f"Rescan triggered for {count} photos")
+                    else:
+                        # Retry unprocessed
+                        result = await session.execute(
+                            select(Photo).where(
+                                Photo.user_id == user_id,
+                                Photo.deleted_at == None,
+                                Photo.processed_at == None
+                            )
+                        )
+                        photos = result.scalars().all()
+                        if photos:
+                            from app.celery_app import celery_app
+                            count = 0
+                            for photo in photos:
+                                celery_app.send_task(
+                                    'app.workers.thumbnail_worker.process_photo_analysis',
+                                    args=[str(photo.photo_id), str(photo.photo_id)]
+                                )
+                                count += 1
+                            user_msg.append(f"Retrying analysis for {count} unprocessed photos")
+                
+                if user_msg:
+                     results.append(f"{prefix} {', '.join(user_msg)}")
+                else:
+                     results.append(f"{prefix} No scopes selected")
 
-    # Update job as completed
-    job.status = "completed"
-    job.completed_at = func.now()
-    job.message = " | ".join(results)
-    await db.commit()
-
-    return {"status": "success", "details": " | ".join(results), "job_id": str(job.job_id)}
+            # Update job as completed
+            job.status = "completed"
+            job.completed_at = func.now()
+            job.message = " | ".join(results)
+            await session.commit()
+            
+        except Exception as e:
+            print(f"Error in background clustering: {e}")
+            # Try to update job status to failed
+            try:
+                job.status = "failed"
+                job.error = str(e)
+                await session.commit()
+            except:
+                pass
