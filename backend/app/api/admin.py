@@ -187,19 +187,29 @@ async def process_clustering_job(job_id: uuid.UUID, request: ClusterRequest, db:
                         user_msg.append("Faces reset")
                     
                     from app.celery_app import celery_app
-                    celery_app.send_task('app.workers.face_worker.cluster_faces', args=[str(user_id)])
-                    user_msg.append("Face clustering queued")
+                    try:
+                        celery_app.send_task('app.workers.face_worker.cluster_faces', args=[str(user_id)])
+                        print(f"✅ Face clustering task sent for user {user_id}")
+                        user_msg.append("Face clustering queued")
+                    except Exception as e:
+                        print(f"❌ Failed to send face clustering task: {e}")
+                        user_msg.append(f"Face clustering FAILED: {e}")
 
                 # 2. Animals
                 if "animals" in request.scopes:
                     # animal clustering service handles reset logic internally
                     from app.celery_app import celery_app
-                    celery_app.send_task(
-                        'app.workers.face_worker.cluster_animals',
-                        args=[str(user_id)],
-                        kwargs={'force_reset': request.force_reset}
-                    )
-                    user_msg.append("Animal clustering queued")
+                    try:
+                        celery_app.send_task(
+                            'app.workers.face_worker.cluster_animals',
+                            args=[str(user_id)],
+                            kwargs={'force_reset': request.force_reset}
+                        )
+                        print(f"✅ Animal clustering task sent for user {user_id}")
+                        user_msg.append("Animal clustering queued")
+                    except Exception as e:
+                        print(f"❌ Failed to send animal clustering task: {e}")
+                        user_msg.append(f"Animal clustering FAILED: {e}")
 
                 # 3. Hashtags (Re-scan)
                 if "hashtags" in request.scopes:
@@ -219,11 +229,15 @@ async def process_clustering_job(job_id: uuid.UUID, request: ClusterRequest, db:
                         
                         count = 0
                         for photo in photos:
-                             celery_app.send_task(
-                                'app.workers.thumbnail_worker.process_photo_analysis',
-                                args=[str(photo.photo_id), str(photo.photo_id)]
-                            )
-                             count += 1
+                            try:
+                                celery_app.send_task(
+                                    'app.workers.thumbnail_worker.process_photo_analysis',
+                                    args=[str(photo.photo_id), str(photo.photo_id)]
+                                )
+                                count += 1
+                            except Exception as e:
+                                print(f"❌ Failed to send hashtag task: {e}")
+                                break
                         user_msg.append(f"Rescan triggered for {count} photos")
                     else:
                         # Retry unprocessed
@@ -239,11 +253,15 @@ async def process_clustering_job(job_id: uuid.UUID, request: ClusterRequest, db:
                             from app.celery_app import celery_app
                             count = 0
                             for photo in photos:
-                                celery_app.send_task(
-                                    'app.workers.thumbnail_worker.process_photo_analysis',
-                                    args=[str(photo.photo_id), str(photo.photo_id)]
-                                )
-                                count += 1
+                                try:
+                                    celery_app.send_task(
+                                        'app.workers.thumbnail_worker.process_photo_analysis',
+                                        args=[str(photo.photo_id), str(photo.photo_id)]
+                                    )
+                                    count += 1
+                                except Exception as e:
+                                    print(f"❌ Failed to send retry hashtag task: {e}")
+                                    break
                             user_msg.append(f"Retrying analysis for {count} unprocessed photos")
                 
                 if user_msg:
