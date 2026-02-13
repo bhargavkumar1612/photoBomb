@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "PhotoBomb"
     APP_ENV: str = "development"
     DEBUG: bool = False
-    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173,http://192.168.1.5:3000"
+    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173,https://photobomb.bhargavkumar1612.workers.dev"
     
     # Database
     DATABASE_URL: str
