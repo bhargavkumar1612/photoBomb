@@ -25,9 +25,9 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser
 COPY --chown=appuser:appuser . .
 
 # Permissions
-RUN chmod +x scripts/*.sh
+RUN chmod 755 /app/scripts/*.sh
 
 USER appuser
 EXPOSE 10000
 
-CMD ["./scripts/start_web.sh"]
+CMD ["/bin/bash", "/app/scripts/start_web.sh"]
