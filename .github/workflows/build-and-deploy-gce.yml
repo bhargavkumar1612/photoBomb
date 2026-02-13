@@ -62,9 +62,18 @@ jobs:
           host: ${{ secrets.GCE_HOST }}
           username: ${{ secrets.GCE_USERNAME }}
           key: ${{ secrets.SSH_KEY }}
-          source: "docker-compose.yml,backend/scripts/deploy_gce_worker.sh"
+          source: "docker-compose.prod.yml,backend/scripts/deploy_gce_worker.sh"
           target: "/opt/photobomb"
           strip_components: 0
+
+      - name: Rename prod compose file
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.GCE_HOST }}
+          username: ${{ secrets.GCE_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            mv /opt/photobomb/docker-compose.prod.yml /opt/photobomb/docker-compose.yml
 
       - name: Deploy to GCE via SSH
         uses: appleboy/ssh-action@master

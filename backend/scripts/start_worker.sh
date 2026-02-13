@@ -20,4 +20,4 @@ export DATABASE_POOL_SIZE=0
 export MALLOC_TRIM_THRESHOLD_=65536
 export PYTHONMALLOC=malloc
 
-exec celery -A app.celery_app worker -Q high,low -c 1 --loglevel=info --without-gossip --without-mingle
+exec celery -A app.celery_app worker -Q high,low,celery -c 1 --loglevel=info --without-gossip --without-mingle
