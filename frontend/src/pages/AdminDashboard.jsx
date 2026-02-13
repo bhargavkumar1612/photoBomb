@@ -148,7 +148,7 @@ export default function AdminDashboard() {
                             </button>
                         </div>
                         <div className="user-checklist">
-                            {users.map(u => (
+                            {(users || []).map(u => (
                                 <label key={u.user_id} className={`user-checkbox-row ${selectedUserIds.has(u.user_id) ? 'selected' : ''}`}>
                                     <input
                                         type="checkbox"
@@ -243,7 +243,7 @@ export default function AdminDashboard() {
                     </div>
 
                     <div className="jobs-table-container">
-                        {jobs.length === 0 ? (
+                        {(!jobs || jobs.length === 0) ? (
                             <div className="empty-state">
                                 <Database size={48} />
                                 <p>No jobs yet. Launch your first maintenance job!</p>
@@ -269,14 +269,14 @@ export default function AdminDashboard() {
                                             </td>
                                             <td>
                                                 <div className="scope-tags">
-                                                    {job.scopes.map(scope => (
+                                                    {(job.scopes || []).map(scope => (
                                                         <span key={scope} className="scope-tag">{scope}</span>
                                                     ))}
                                                 </div>
                                             </td>
-                                            <td>{job.target_user_ids.length} user(s)</td>
+                                            <td>{(job.target_user_ids || []).length} user(s)</td>
                                             <td className="time-cell">
-                                                {new Date(job.created_at).toLocaleString()}
+                                                {job.created_at ? new Date(job.created_at).toLocaleString() : '-'}
                                             </td>
                                             <td className="message-cell">{job.message || '-'}</td>
                                         </tr>
