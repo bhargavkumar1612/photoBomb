@@ -17,17 +17,17 @@ fi
 
 echo "⬇️ Pulling latest images..."
 # We explicitly pull to ensure we get the latest
-sudo docker-compose pull worker redis
+sudo docker compose pull worker redis
 
 echo "▶️ Restarting services..."
 # up -d checks for changes and recreates containers if needed
 # --remove-orphans cleans up old containers not in the compose file
-sudo docker-compose up -d --remove-orphans worker redis
+sudo docker compose up -d --remove-orphans worker redis
 
 echo "🧹 Cleaning up old images..."
 sudo docker image prune -f
 
 echo "✅ Deployment Complete!"
-sudo docker-compose ps
+sudo docker compose ps
 echo "--- Worker Logs ---"
-sudo docker-compose logs --tail 20 worker
+sudo docker compose logs --tail 20 worker
