@@ -143,13 +143,12 @@ async def trigger_admin_clustering(
     background_tasks.add_task(
         process_clustering_job,
         job.job_id,
-        request,
-        db 
+        request
     )
 
     return {"status": "queued", "job_id": str(job.job_id), "message": "Job queued in background"}
 
-async def process_clustering_job(job_id: uuid.UUID, request: ClusterRequest, db: AsyncSession):
+async def process_clustering_job(job_id: uuid.UUID, request: ClusterRequest):
     """
     Background task to handle the actual clustering logic.
     Note: We need a new session or careful management if db is passed.
