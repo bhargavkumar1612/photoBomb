@@ -23,7 +23,7 @@ RUN mkdir -p $HF_HOME
 COPY --chown=appuser:appuser . .
 
 # Permissions
-RUN chmod +x scripts/*.sh
+RUN chmod 755 /app/scripts/start_worker.sh
 
 # Switch back to non-root user (created in base)
 USER appuser
