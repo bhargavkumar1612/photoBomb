@@ -1,0 +1,92 @@
+name: Build and Deploy Worker Only
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'backend/app/workers/**'
+      - 'backend/Dockerfile.worker'
+      - '.github/workflows/build-and-deploy-worker-only.yml'
+
+jobs:
+  build-worker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile.worker
+          platforms: linux/amd64
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/photobomb-worker:latest
+          cache-to: type=gha,mode=max
+
+  deploy-worker:
+    needs: build-worker
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Copy deployment files
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.GCE_HOST }}
+          username: ${{ secrets.GCE_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          source: "docker-compose.yml"
+          target: "/opt/photobomb"
+          strip_components: 0
+
+      - name: Deploy Worker via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.GCE_HOST }}
+          username: ${{ secrets.GCE_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd /opt/photobomb || exit 1
+            
+            # Update .env
+            echo "${{ secrets.ENV_FILE }}" > .env
+            tr -d '\r' < .env > .env.tmp && mv .env.tmp .env
+            sed -i 's/^export //I' .env
+            sed -i 's/^[[:space:]]*//;s/[[:space:]]*$//' .env
+            grep -vE '^\s*#' .env | grep -vE '^\s*$' > .env.clean
+            mv .env.clean .env
+            sed -i 's/ *= */=/' .env
+            echo "" >> .env
+            
+            if [ -z "$JWT_SECRET_KEY" ] && [ -n "$JWT_SECRET" ]; then
+              echo "JWT_SECRET_KEY=${JWT_SECRET}" >> .env
+            fi
+
+            if [ -z "$REDIS_URL" ] && [ -n "$REDIS_PASSWORD" ]; then
+                echo "REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0" >> .env
+            fi
+            
+            # Pull and restart ONLY worker
+            echo "⬇️ Pulling Worker..."
+            sudo docker compose pull worker
+            
+            echo "▶️ Restarting Worker..."
+            sudo docker compose up -d --no-deps worker
+            
+            echo "✅ Worker Deployment Complete!"
+            sudo docker compose ps

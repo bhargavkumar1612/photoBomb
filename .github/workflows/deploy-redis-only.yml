@@ -1,0 +1,63 @@
+name: Deploy Redis Only
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy-redis:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Copy deployment files to GCE
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.GCE_HOST }}
+          username: ${{ secrets.GCE_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          source: "docker-compose.yml"
+          target: "/opt/photobomb"
+          strip_components: 0
+
+      - name: Deploy to GCE via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.GCE_HOST }}
+          username: ${{ secrets.GCE_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            echo "🚀 Deploying Redis only..."
+            
+            cd /opt/photobomb || mkdir -p /opt/photobomb && cd /opt/photobomb
+            
+            # Create .env file from secrets (Needed for REDIS_PASSWORD)
+            echo "${{ secrets.ENV_FILE }}" > .env
+            
+            # Sanitize .env file
+            tr -d '\r' < .env > .env.tmp && mv .env.tmp .env
+            sed -i 's/^export //I' .env
+            sed -i 's/^[[:space:]]*//;s/[[:space:]]*$//' .env
+            grep -vE '^\s*#' .env | grep -vE '^\s*$' > .env.clean
+            mv .env.clean .env
+            sed -i 's/ *= */=/' .env
+            echo "" >> .env
+            
+            # Ensure proper permissions
+            chmod 600 .env
+            
+            # Check for docker-compose.yml
+            if [ ! -f docker-compose.yml ]; then
+                echo "❌ Error: docker-compose.yml not found!"
+                exit 1
+            fi
+            
+            echo "⬇️ Pulling Redis image..."
+            sudo docker compose pull redis
+            
+            echo "▶️ Restarting Redis service..."
+            # Using --no-deps to ensure we don't accidentally restart dependent services (worker/backend)
+            sudo docker compose up -d --no-deps redis
+            
+            echo "✅ Redis Deployment Complete!"
+            sudo docker compose ps

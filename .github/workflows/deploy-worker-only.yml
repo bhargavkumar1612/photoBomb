@@ -1,0 +1,89 @@
+name: Deploy Worker Only (Skip Build)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy-worker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Copy deployment files to GCE
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.GCE_HOST }}
+          username: ${{ secrets.GCE_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          source: "docker-compose.yml,backend/scripts/deploy_gce_worker.sh"
+          target: "/opt/photobomb"
+          strip_components: 0
+
+      - name: Deploy to GCE via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.GCE_HOST }}
+          username: ${{ secrets.GCE_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            echo "🚀 Deploying existing worker image..."
+            
+            # Switch to deployment directory
+            cd /opt/photobomb || mkdir -p /opt/photobomb && cd /opt/photobomb
+            
+            # Move script to root if needed (handling scp path structure)
+            if [ -f "backend/scripts/deploy_gce_worker.sh" ]; then
+                cp backend/scripts/deploy_gce_worker.sh .
+                chmod +x deploy_gce_worker.sh
+            fi
+            
+            # Create .env file from secrets
+            echo "${{ secrets.ENV_FILE }}" > .env
+            
+            # Sanitize .env file (Robust cleaning for Docker)
+            tr -d '\r' < .env > .env.tmp && mv .env.tmp .env
+            sed -i 's/^export //I' .env
+            sed -i 's/^[[:space:]]*//;s/[[:space:]]*$//' .env
+            grep -vE '^\s*#' .env | grep -vE '^\s*$' > .env.clean
+            mv .env.clean .env
+            sed -i 's/ *= */=/' .env
+            
+            # Ensure file ends with a newline before appending anything
+            echo "" >> .env
+            
+            # Source to see what we have
+            set -a
+            source .env
+            set +a
+            
+            if [ -z "$DATABASE_URL" ] && [ -n "$DB_HOST" ]; then
+              echo "DATABASE_URL=postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_DATABASE}" >> .env
+            fi
+            
+            if [ -z "$JWT_SECRET_KEY" ] && [ -n "$JWT_SECRET" ]; then
+              echo "JWT_SECRET_KEY=${JWT_SECRET}" >> .env
+            fi
+
+            if [ -z "$REDIS_URL" ] && [ -n "$REDIS_PASSWORD" ]; then
+                echo "🔧 Constructing Internal REDIS_URL for GCE Worker..."
+                echo "REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0" >> .env
+            fi
+            
+            echo "🔍 Debugging .env file keys (Values masked):"
+            awk -F= '{ if($1) print $1 }' .env
+            
+            # Ensure network exists (Critical for first-time run)
+            sudo docker network create photobomb_default || true
+            
+            # Locate and run deployment script
+            SCRIPT_PATH="./deploy_gce_worker.sh"
+            
+            if [ -f "$SCRIPT_PATH" ]; then
+              echo "🚀 Found script at $SCRIPT_PATH"
+              chmod +x "$SCRIPT_PATH"
+              "$SCRIPT_PATH"
+            else
+              echo "⚠️ deploy_gce_worker.sh not found!"
+              exit 1
+            fi

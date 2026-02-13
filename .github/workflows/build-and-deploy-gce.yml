@@ -1,4 +1,4 @@
-name: Build and Push Worker Image
+name: Build and Deploy GCE (Worker + Redis)
 
 on:
   workflow_dispatch:
