@@ -15,6 +15,13 @@ if [ ! -f docker-compose.yml ]; then
     exit 1
 fi
 
+# Stop legacy container if running (from old deployment method)
+if [ "$(sudo docker ps -q -f name=photo-worker)" ]; then
+    echo "🛑 Stopping legacy 'photo-worker' container..."
+    sudo docker stop photo-worker
+    sudo docker rm photo-worker
+fi
+
 echo "⬇️ Pulling latest images..."
 # We explicitly pull to ensure we get the latest
 sudo docker compose pull worker redis

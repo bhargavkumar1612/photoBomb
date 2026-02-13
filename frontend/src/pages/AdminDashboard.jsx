@@ -119,7 +119,7 @@ export default function AdminDashboard() {
                 <div className="stat-card">
                     <UsersIcon size={24} />
                     <div className="stat-content">
-                        <div className="stat-value">{stats.totalUsers}</div>
+                        <div className="stat-value">{stats?.totalUsers || 0}</div>
                         <div className="stat-label">Total Users</div>
                     </div>
                 </div>
