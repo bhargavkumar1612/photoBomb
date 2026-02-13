@@ -70,20 +70,7 @@ function AdminRoute({ children }) {
     return children
 }
 
-function ConditionalAnimalRoutes() {
-    const { animal_detection_enabled, loading } = useFeatures()
 
-    if (loading) return null
-
-    if (!animal_detection_enabled) return null
-
-    return (
-        <>
-            <Route path="/animals" element={<AnimalsPage />} />
-            <Route path="/animals/:id" element={<AnimalDetailPage />} />
-        </>
-    )
-}
 
 function App() {
     useEffect(() => {
@@ -101,55 +88,70 @@ function App() {
             <FeaturesProvider>
                 <SearchProvider>
                     <div className="app-container">
-                        <Routes>
-                            <Route path="/login" element={
-                                <PublicOnlyRoute>
-                                    <Login />
-                                </PublicOnlyRoute>
-                            } />
-                            <Route path="/register" element={
-                                <PublicOnlyRoute>
-                                    <Register />
-                                </PublicOnlyRoute>
-                            } />
-
-                            <Route element={
-                                <ProtectedRoute>
-                                    <AppLayout />
-                                </ProtectedRoute>
-                            }>
-                                <Route path="/" element={<Timeline />} />
-                                <Route path="/explore" element={<PlaceholderPage title="Explore" />} />
-                                <Route path="/sharing" element={<Sharing />} />
-                                <Route path="/albums" element={<Albums />} />
-                                <Route path="/albums/:albumId" element={<AlbumDetail />} />
-                                <Route path="/shared/:token" element={<SharedAlbumView />} />
-                                <Route path="/people" element={<PeoplePage />} />
-                                <Route path="/people/:id" element={<PersonDetailPage />} />
-                                <Route path="/places" element={<MapPage />} />
-                                <ConditionalAnimalRoutes />
-                                <Route path="/hashtags" element={<HashtagsPage />} />
-                                <Route path="/hashtags/tag/:tagId" element={<HashtagDetailPage />} />
-                                <Route path="/favorites" element={<Timeline favoritesOnly={true} />} />
-                                <Route path="/trash" element={<Trash />} />
-                                <Route path="/settings" element={<Settings />} />
-                                <Route path="/upload" element={<Upload />} />
-                                <Route path="/admin" element={
-                                    <AdminRoute>
-                                        <AdminDashboard />
-                                    </AdminRoute>
-                                } />
-                            </Route>
-
-                            {/* Catch all - redirect to home (which is protected, so will redirect to login if needed) */}
-                            <Route path="*" element={<Navigate to="/" replace />} />
-                        </Routes>
-
+                        <AppRoutes />
                         <UploadProgressWidget />
                     </div>
                 </SearchProvider>
             </FeaturesProvider>
         </AuthProvider>
+    )
+}
+
+function AppRoutes() {
+    const { animal_detection_enabled, loading } = useFeatures()
+
+    return (
+        <Routes>
+            <Route path="/login" element={
+                <PublicOnlyRoute>
+                    <Login />
+                </PublicOnlyRoute>
+            } />
+            <Route path="/register" element={
+                <PublicOnlyRoute>
+                    <Register />
+                </PublicOnlyRoute>
+            } />
+
+            <Route element={
+                <ProtectedRoute>
+                    <AppLayout />
+                </ProtectedRoute>
+            }>
+                <Route path="/" element={<Timeline />} />
+                <Route path="/explore" element={<PlaceholderPage title="Explore" />} />
+                <Route path="/sharing" element={<Sharing />} />
+                <Route path="/albums" element={<Albums />} />
+                <Route path="/albums/:albumId" element={<AlbumDetail />} />
+                <Route path="/shared/:token" element={<SharedAlbumView />} />
+                <Route path="/people" element={<PeoplePage />} />
+                <Route path="/people/:id" element={<PersonDetailPage />} />
+                <Route path="/places" element={<MapPage />} />
+
+                {/* Conditionally render Animal Routes */}
+                {!loading && animal_detection_enabled && (
+                    <>
+                        <Route path="/animals" element={<AnimalsPage />} />
+                        <Route path="/animals/:id" element={<AnimalDetailPage />} />
+                    </>
+                )}
+
+                <Route path="/hashtags" element={<HashtagsPage />} />
+                <Route path="/hashtags/tag/:tagId" element={<HashtagDetailPage />} />
+                <Route path="/favorites" element={<Timeline favoritesOnly={true} />} />
+                <Route path="/trash" element={<Trash />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/upload" element={<Upload />} />
+                <Route path="/admin" element={
+                    <AdminRoute>
+                        <AdminDashboard />
+                    </AdminRoute>
+                } />
+            </Route>
+
+            {/* Catch all - redirect to home */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
     )
 }
 
