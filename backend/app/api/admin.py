@@ -158,6 +158,7 @@ async def process_clustering_job(job_id: uuid.UUID, request: ClusterRequest, db:
     from app.core.database import async_session_factory
     
     async with async_session_factory() as session:
+        print(f"🔄 BackgroundTask started for job {job_id}, scopes={request.scopes}", flush=True)
         try:
              # Fetch job again to update it
             result = await session.execute(select(AdminJob).where(AdminJob.job_id == job_id))
@@ -189,10 +190,10 @@ async def process_clustering_job(job_id: uuid.UUID, request: ClusterRequest, db:
                     from app.celery_app import celery_app
                     try:
                         celery_app.send_task('app.workers.face_worker.cluster_faces', args=[str(user_id)])
-                        print(f"✅ Face clustering task sent for user {user_id}")
+                        print(f"✅ Face clustering task sent for user {user_id}", flush=True)
                         user_msg.append("Face clustering queued")
                     except Exception as e:
-                        print(f"❌ Failed to send face clustering task: {e}")
+                        print(f"❌ Failed to send face clustering task: {e}", flush=True)
                         user_msg.append(f"Face clustering FAILED: {e}")
 
                 # 2. Animals
@@ -205,10 +206,10 @@ async def process_clustering_job(job_id: uuid.UUID, request: ClusterRequest, db:
                             args=[str(user_id)],
                             kwargs={'force_reset': request.force_reset}
                         )
-                        print(f"✅ Animal clustering task sent for user {user_id}")
+                        print(f"✅ Animal clustering task sent for user {user_id}", flush=True)
                         user_msg.append("Animal clustering queued")
                     except Exception as e:
-                        print(f"❌ Failed to send animal clustering task: {e}")
+                        print(f"❌ Failed to send animal clustering task: {e}", flush=True)
                         user_msg.append(f"Animal clustering FAILED: {e}")
 
                 # 3. Hashtags (Re-scan)
@@ -236,7 +237,7 @@ async def process_clustering_job(job_id: uuid.UUID, request: ClusterRequest, db:
                                 )
                                 count += 1
                             except Exception as e:
-                                print(f"❌ Failed to send hashtag task: {e}")
+                                print(f"❌ Failed to send hashtag task: {e}", flush=True)
                                 break
                         user_msg.append(f"Rescan triggered for {count} photos")
                     else:
@@ -260,7 +261,7 @@ async def process_clustering_job(job_id: uuid.UUID, request: ClusterRequest, db:
                                     )
                                     count += 1
                                 except Exception as e:
-                                    print(f"❌ Failed to send retry hashtag task: {e}")
+                                    print(f"❌ Failed to send retry hashtag task: {e}", flush=True)
                                     break
                             user_msg.append(f"Retrying analysis for {count} unprocessed photos")
                 
@@ -276,7 +277,7 @@ async def process_clustering_job(job_id: uuid.UUID, request: ClusterRequest, db:
             await session.commit()
             
         except Exception as e:
-            print(f"Error in background clustering: {e}")
+            print(f"💥 Error in background clustering: {e}", flush=True)
             # Try to update job status to failed
             try:
                 job.status = "failed"
