@@ -29,10 +29,14 @@ export default function AdminDashboard() {
     const fetchUsers = async () => {
         try {
             const res = await api.get('/admin/users')
-            setUsers(res.data)
-            setStats(prev => ({ ...prev, totalUsers: res.data.length }))
+            const userData = Array.isArray(res.data) ? res.data : []
+            setUsers(userData)
+            setStats(prev => ({ ...prev, totalUsers: userData.length }))
             // Select current user by default
-            if (user) setSelectedUserIds(new Set([user.user_id]))
+            // Select current user by default only if valid
+            if (user && user.user_id) {
+                setSelectedUserIds(new Set([user.user_id]))
+            }
         } catch (err) {
             console.error('Failed to load users:', err)
         }
@@ -42,7 +46,8 @@ export default function AdminDashboard() {
         setJobsLoading(true)
         try {
             const res = await api.get('/admin/jobs?limit=10')
-            setJobs(res.data)
+            const jobsData = Array.isArray(res.data) ? res.data : []
+            setJobs(jobsData)
         } catch (err) {
             console.error('Failed to load jobs:', err)
         } finally {
