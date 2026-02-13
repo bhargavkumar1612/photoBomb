@@ -53,6 +53,19 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ success() }}
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Copy deployment files to GCE
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.GCE_HOST }}
+          username: ${{ secrets.GCE_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          source: "docker-compose.yml,backend/scripts/deploy_gce_worker.sh"
+          target: "/opt/photobomb"
+          strip_components: 0
+
       - name: Deploy to GCE via SSH
         uses: appleboy/ssh-action@master
         with:
@@ -64,6 +77,12 @@ jobs:
             
             # Switch to deployment directory
             cd /opt/photobomb || mkdir -p /opt/photobomb && cd /opt/photobomb
+            
+            # Move script to root if needed (handling scp path structure)
+            if [ -f "backend/scripts/deploy_gce_worker.sh" ]; then
+                cp backend/scripts/deploy_gce_worker.sh .
+                chmod +x deploy_gce_worker.sh
+            fi
             
             # Create .env file from secrets
             echo "${{ secrets.ENV_FILE }}" > .env
@@ -98,9 +117,15 @@ jobs:
             fi
             
             if [ -z "$JWT_SECRET_KEY" ] && [ -n "$JWT_SECRET" ]; then
-              echo "🔧 Mapping JWT_SECRET -> JWT_SECRET_KEY..."
               echo "JWT_SECRET_KEY=${JWT_SECRET}" >> .env
             fi
+
+            if [ -z "$REDIS_URL" ] && [ -n "$REDIS_PASSWORD" ]; then
+                echo "🔧 Constructing Internal REDIS_URL for GCE Worker..."
+                echo "REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0" >> .env
+            fi
+
+
             
             echo "🔍 Debugging .env file keys (Values masked):"
             awk -F= '{ if($1) print $1 }' .env

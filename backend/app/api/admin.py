@@ -13,6 +13,8 @@ from app.services.animal_clustering import cluster_animals
 from app.models.person import Person
 from app.models.animal import Animal
 from app.models.photo import Photo
+from app.models.admin_job import AdminJob
+from sqlalchemy import func
 
 router = APIRouter()
 
@@ -32,6 +34,22 @@ class AdminUserResponse(BaseModel):
     def set_false_if_none(cls, v):
         return v or False
 
+class AdminJobResponse(BaseModel):
+    job_id: uuid.UUID
+    job_type: str
+    status: str
+    scopes: List[str]
+    target_user_ids: List[uuid.UUID]
+    force_reset: bool
+    progress_current: int
+    progress_total: int
+    message: Optional[str]
+    error: Optional[str]
+    created_at: str
+    started_at: Optional[str]
+    completed_at: Optional[str]
+
+
 @router.get("/users", response_model=List[AdminUserResponse])
 async def list_users(
     current_user: User = Depends(get_current_user),
@@ -44,6 +62,43 @@ async def list_users(
     result = await db.execute(select(User))
     users = result.scalars().all()
     return users
+
+@router.get("/jobs", response_model=List[AdminJobResponse])
+async def list_jobs(
+    limit: int = 20,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get recent admin jobs with their status."""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+    
+    result = await db.execute(
+        select(AdminJob)
+        .order_by(AdminJob.created_at.desc())
+        .limit(limit)
+    )
+    jobs = result.scalars().all()
+    
+    return [
+        AdminJobResponse(
+            job_id=job.job_id,
+            job_type=job.job_type,
+            status=job.status,
+            scopes=job.scopes,
+            target_user_ids=[uuid.UUID(uid) for uid in job.target_user_ids],
+            force_reset=job.force_reset,
+            progress_current=job.progress_current,
+            progress_total=job.progress_total,
+            message=job.message,
+            error=job.error,
+            created_at=job.created_at.isoformat() if job.created_at else None,
+            started_at=job.started_at.isoformat() if job.started_at else None,
+            completed_at=job.completed_at.isoformat() if job.completed_at else None,
+        )
+        for job in jobs
+    ]
+
 
 @router.post("/cluster")
 async def trigger_admin_clustering(
@@ -58,6 +113,21 @@ async def trigger_admin_clustering(
     """
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Admin privileges required")
+
+    # Create job record
+    job = AdminJob(
+        user_id=current_user.user_id,
+        job_type="cluster",
+        status="running",
+        target_user_ids=[str(uid) for uid in request.target_user_ids],
+        scopes=request.scopes,
+        force_reset=request.force_reset,
+        message="Job started",
+        started_at=func.now()
+    )
+    db.add(job)
+    await db.commit()
+    await db.refresh(job)
 
     results = []
 
@@ -150,4 +220,10 @@ async def trigger_admin_clustering(
         else:
              results.append(f"{prefix} No scopes selected")
 
-    return {"status": "success", "details": " | ".join(results)}
+    # Update job as completed
+    job.status = "completed"
+    job.completed_at = func.now()
+    job.message = " | ".join(results)
+    await db.commit()
+
+    return {"status": "success", "details": " | ".join(results), "job_id": str(job.job_id)}

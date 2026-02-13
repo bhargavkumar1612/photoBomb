@@ -1,24 +1,87 @@
+version: '3.8'
+
 networks:
-  default:
-    name: photobomb_app_net
-    external: false
+  photobomb_net:
+    driver: bridge
+
+volumes:
+  redis-data:
+
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: photobomb-redis
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:6379:6379"
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru --save 60 1 --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - photobomb_net
+
+  backend:
     build:
       context: ./backend
       dockerfile: Dockerfile.backend
+    image: bhargavkumar1612/photobomb-backend:latest
+    container_name: photobomb-backend
+    restart: unless-stopped
     ports:
       - "8000:8000"
-    # Pass all env vars from host (which reads .env) to container
+    depends_on:
+      redis:
+        condition: service_healthy
     environment:
-      - DATABASE_URL
-      - REDIS_URL
-      - JWT_SECRET_KEY
-      - B2_APPLICATION_KEY_ID
-      - B2_APPLICATION_KEY
-      - B2_BUCKET_NAME
-      - B2_BUCKET_ID
-      - GOOGLE_CLIENT_ID
-      - GOOGLE_CLIENT_SECRET
-      - APP_ENV
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - B2_APPLICATION_KEY_ID=${B2_APPLICATION_KEY_ID}
+      - B2_APPLICATION_KEY=${B2_APPLICATION_KEY}
+      - B2_BUCKET_NAME=${B2_BUCKET_NAME}
+      - B2_BUCKET_ID=${B2_BUCKET_ID}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - APP_ENV=${APP_ENV}
+      - ANIMAL_DETECTION_ENABLED=${ANIMAL_DETECTION_ENABLED:-false}
+      - HF_TOKEN=${HF_TOKEN:-}
     volumes:
       - ./backend:/app
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - photobomb_net
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.worker
+    image: bhargavkumar1612/photobomb-worker:latest
+    container_name: photobomb-worker
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - B2_APPLICATION_KEY_ID=${B2_APPLICATION_KEY_ID}
+      - B2_APPLICATION_KEY=${B2_APPLICATION_KEY}
+      - B2_BUCKET_NAME=${B2_BUCKET_NAME}
+      - B2_BUCKET_ID=${B2_BUCKET_ID}
+      - STORAGE_PATH_PREFIX=${STORAGE_PATH_PREFIX}
+      - APP_ENV=${APP_ENV}
+      - ANIMAL_DETECTION_ENABLED=${ANIMAL_DETECTION_ENABLED:-false}
+      - HF_TOKEN=${HF_TOKEN:-}
+    volumes:
+      - ./backend:/app
+    networks:
+      - photobomb_net

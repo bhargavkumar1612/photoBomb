@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
+    REDIS_PASSWORD: str = ""
     
     # JWT
     JWT_SECRET_KEY: str
@@ -56,6 +57,9 @@ class Settings(BaseSettings):
     
     # Animal Detection (Disabled by default due to memory usage)
     ANIMAL_DETECTION_ENABLED: bool = False
+    
+    # Hugging Face Token for model downloads (optional, improves rate limits)
+    HF_TOKEN: str = ""
     
     # OAuth (optional)
     GOOGLE_CLIENT_ID: str = ""

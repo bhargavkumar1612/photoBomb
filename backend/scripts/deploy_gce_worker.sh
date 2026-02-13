@@ -1,50 +1,33 @@
 #!/bin/bash
-# Script to update and restart the worker on GCE
-# Run this script ON the GCE server (or via SSH)
+# Script to update and restart the worker + redis on GCE
+# This script assumes docker-compose.yml and .env are present in the current directory
 
-CONTAINER_NAME="photo-worker"
-IMAGE_NAME="bhargavkumar1612/photobomb-worker:latest"
+echo "🚀 Starting Deployment (Redis + Worker)..."
 
-echo "🚀 Starting Worker Deployment..."
-
-# 1. Stop existing container
-if [ "$(sudo docker ps -q -f name=$CONTAINER_NAME)" ]; then
-    echo "🛑 Stopping existing container..."
-    sudo docker stop $CONTAINER_NAME
-fi
-
-# 2. Remove existing container
-if [ "$(sudo docker ps -aq -f name=$CONTAINER_NAME)" ]; then
-    echo "🗑️ Removing existing container..."
-    sudo docker rm $CONTAINER_NAME
-fi
-
-# 3. Pull latest image
-echo "⬇️ Pulling latest image..."
-sudo docker pull $IMAGE_NAME
-
-# 4. Run new container
-echo "▶️ Starting new worker..."
 # Ensure .env exists
 if [ ! -f .env ]; then
     echo "⚠️ Warning: .env file not found in current directory!"
 fi
 
-# Ensure network exists (Compatible with Docker Compose)
-# If network doesn't exist, create it. If it exists but was created by Compose, this command is harmless.
-sudo docker network create photobomb_app_net || true
+# Check if docker-compose.yml exists
+if [ ! -f docker-compose.yml ]; then
+    echo "❌ Error: docker-compose.yml not found!"
+    exit 1
+fi
 
-sudo docker run -d \
-  --name $CONTAINER_NAME \
-  --env-file .env \
-  -e APP_ENV=production \
-  --network photobomb_app_net \
-  --restart unless-stopped \
-  $IMAGE_NAME
+echo "⬇️ Pulling latest images..."
+# We explicitly pull to ensure we get the latest
+sudo docker-compose pull worker redis
 
-# 5. Cleanup old images to save disk space (Critical for Free Tier)
+echo "▶️ Restarting services..."
+# up -d checks for changes and recreates containers if needed
+# --remove-orphans cleans up old containers not in the compose file
+sudo docker-compose up -d --remove-orphans worker redis
+
 echo "🧹 Cleaning up old images..."
 sudo docker image prune -f
 
 echo "✅ Deployment Complete!"
-sudo docker logs --tail 20 $CONTAINER_NAME
+sudo docker-compose ps
+echo "--- Worker Logs ---"
+sudo docker-compose logs --tail 20 worker

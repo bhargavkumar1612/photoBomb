@@ -1,6 +1,7 @@
 from typing import Tuple
 import logging
 import gc
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -20,13 +21,30 @@ def get_clip_model():
         
         # Use safetensors for memory efficiency if available, otherwise fallback
         # Given the OOM issues, we explicitly prefer safetensors and aggressive GC
+        token = settings.HF_TOKEN if settings.HF_TOKEN else None
         try:
-            _clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32", use_safetensors=True)
-            _clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32", use_safetensors=True)
+            _clip_model = CLIPModel.from_pretrained(
+                "openai/clip-vit-base-patch32", 
+                use_safetensors=True,
+                token=token
+            )
+            _clip_processor = CLIPProcessor.from_pretrained(
+                "openai/clip-vit-base-patch32",
+                use_safetensors=True,
+                token=token
+            )
         except Exception as e:
             logger.warning(f"Could not load safetensors, falling back to default: {e}")
-            _clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32", use_safetensors=False)
-            _clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32", use_safetensors=False)
+            _clip_model = CLIPModel.from_pretrained(
+                "openai/clip-vit-base-patch32",
+                use_safetensors=False,
+                token=token
+            )
+            _clip_processor = CLIPProcessor.from_pretrained(
+                "openai/clip-vit-base-patch32",
+                use_safetensors=False,
+                token=token
+            )
             
         # Force GC
         gc.collect()

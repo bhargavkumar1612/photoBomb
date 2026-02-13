@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useFeatures } from '../context/FeaturesContext'
+import { RefreshCw, Play, Users as UsersIcon, Image, Database } from 'lucide-react'
 import api from '../services/api'
 import './AdminDashboard.css'
 
@@ -16,21 +17,38 @@ export default function AdminDashboard() {
     const [loading, setLoading] = useState(false)
     const [users, setUsers] = useState([])
     const [selectedUserIds, setSelectedUserIds] = useState(new Set())
-    const [logs, setLogs] = useState([])
+    const [jobs, setJobs] = useState([])
+    const [jobsLoading, setJobsLoading] = useState(false)
+    const [stats, setStats] = useState({ totalUsers: 0, totalPhotos: 0 })
 
     useEffect(() => {
-        const fetchUsers = async () => {
-            try {
-                const res = await api.get('/admin/users')
-                setUsers(res.data)
-                // Select current user by default
-                if (user) setSelectedUserIds(new Set([user.user_id]))
-            } catch (err) {
-                addLog(`⚠️ Failed to load users: ${err.message}`)
-            }
-        }
         fetchUsers()
-    }, [user])
+        fetchJobs()
+    }, [])
+
+    const fetchUsers = async () => {
+        try {
+            const res = await api.get('/admin/users')
+            setUsers(res.data)
+            setStats(prev => ({ ...prev, totalUsers: res.data.length }))
+            // Select current user by default
+            if (user) setSelectedUserIds(new Set([user.user_id]))
+        } catch (err) {
+            console.error('Failed to load users:', err)
+        }
+    }
+
+    const fetchJobs = async () => {
+        setJobsLoading(true)
+        try {
+            const res = await api.get('/admin/jobs?limit=10')
+            setJobs(res.data)
+        } catch (err) {
+            console.error('Failed to load jobs:', err)
+        } finally {
+            setJobsLoading(false)
+        }
+    }
 
     const toggleUser = (userId) => {
         const newSet = new Set(selectedUserIds)
@@ -44,19 +62,15 @@ export default function AdminDashboard() {
         else setSelectedUserIds(new Set(users.map(u => u.user_id)))
     }
 
-    const addLog = (msg) => {
-        setLogs(prev => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev])
-    }
-
     const handleRun = async () => {
         const selectedScopes = Object.keys(scopes).filter(k => scopes[k])
         if (selectedScopes.length === 0) {
-            addLog("❌ No scopes selected")
+            alert('Please select at least one scope')
             return
         }
 
         if (selectedUserIds.size === 0) {
-            addLog("❌ No target users selected")
+            alert('Please select at least one user')
             return
         }
 
@@ -65,34 +79,66 @@ export default function AdminDashboard() {
         }
 
         setLoading(true)
-        addLog(`🚀 Starting job for ${selectedUserIds.size} users: ${selectedScopes.join(', ')} (Reset: ${forceReset})...`)
-
         try {
-            const res = await api.post('/admin/cluster', {
+            await api.post('/admin/cluster', {
                 target_user_ids: Array.from(selectedUserIds),
                 scopes: selectedScopes,
                 force_reset: forceReset
             })
-
-            addLog(`✅ Success: ${res.data.details}`)
+            alert('✅ Job queued successfully!')
+            // Refresh jobs after a short delay
+            setTimeout(fetchJobs, 1000)
         } catch (err) {
-            addLog(`❌ Error: ${err.response?.data?.detail || err.message}`)
+            alert(`❌ Error: ${err.response?.data?.detail || err.message}`)
         } finally {
             setLoading(false)
         }
     }
 
+    const getStatusBadge = (status) => {
+        const badges = {
+            pending: '🕐 Pending',
+            running: '⚡ Running',
+            completed: '✅ Completed',
+            failed: '❌ Failed'
+        }
+        return badges[status] || status
+    }
+
     return (
         <div className="admin-dashboard">
             <header className="admin-header">
-                <h1>⚡ Admin Maintenance</h1>
-                <p>Advanced system controls. Use with caution.</p>
+                <div>
+                    <h1>⚡ Admin Control Center</h1>
+                    <p>System maintenance and monitoring</p>
+                </div>
             </header>
 
+            {/* Stats Overview */}
+            <div className="stats-grid">
+                <div className="stat-card">
+                    <UsersIcon size={24} />
+                    <div className="stat-content">
+                        <div className="stat-value">{stats.totalUsers}</div>
+                        <div className="stat-label">Total Users</div>
+                    </div>
+                </div>
+                <div className="stat-card">
+                    <Database size={24} />
+                    <div className="stat-content">
+                        <div className="stat-value">{jobs.length}</div>
+                        <div className="stat-label">Recent Jobs</div>
+                    </div>
+                </div>
+            </div>
+
             <div className="admin-grid">
+                {/* Job Launcher */}
                 <div className="admin-card">
-                    <h2>AI Clustering Trigger</h2>
-                    <p className="card-desc">Manually trigger AI grouping or re-scanning of the library.</p>
+                    <div className="card-header">
+                        <h2>🚀 Launch Maintenance Job</h2>
+                        <p className="card-desc">Trigger AI clustering or re-scanning</p>
+                    </div>
 
                     <div className="user-selector-container">
                         <div className="selector-header">
@@ -119,40 +165,40 @@ export default function AdminDashboard() {
                     </div>
 
                     <div className="scope-selector">
-                        <label className="checkbox-row">
+                        <label className="scope-card">
                             <input
                                 type="checkbox"
                                 checked={scopes.faces}
                                 onChange={e => setScopes({ ...scopes, faces: e.target.checked })}
                             />
-                            <div className="label-text">
-                                <strong>Face Recognition</strong>
+                            <div className="scope-content">
+                                <strong>👤 Face Recognition</strong>
                                 <span>Group unassigned faces into Persons</span>
                             </div>
                         </label>
 
                         {animal_detection_enabled && (
-                            <label className="checkbox-row">
+                            <label className="scope-card">
                                 <input
                                     type="checkbox"
                                     checked={scopes.animals}
                                     onChange={e => setScopes({ ...scopes, animals: e.target.checked })}
                                 />
-                                <div className="label-text">
-                                    <strong>Animal Detection</strong>
+                                <div className="scope-content">
+                                    <strong>🐾 Animal Detection</strong>
                                     <span>Group detected animals by species</span>
                                 </div>
                             </label>
                         )}
 
-                        <label className="checkbox-row">
+                        <label className="scope-card">
                             <input
                                 type="checkbox"
                                 checked={scopes.hashtags}
                                 onChange={e => setScopes({ ...scopes, hashtags: e.target.checked })}
                             />
-                            <div className="label-text">
-                                <strong>Hashtags & OCR</strong>
+                            <div className="scope-content">
+                                <strong>🏷️ Hashtags & OCR</strong>
                                 <span>Retry failed/unprocessed photos</span>
                             </div>
                         </label>
@@ -165,30 +211,79 @@ export default function AdminDashboard() {
                                 checked={forceReset}
                                 onChange={e => setForceReset(e.target.checked)}
                             />
-                            <span className="slider"></span>
                             <span className="toggle-label">
-                                <strong>Force Full Reset</strong>
-                                <span className="warning">⚠️ Deletes existing groups/tags and re-scans</span>
+                                <strong>⚠️ Force Full Reset</strong>
+                                <span className="warning">Deletes existing groups/tags and re-scans</span>
                             </span>
                         </label>
                     </div>
 
                     <button
-                        className="btn-primary"
+                        className="btn-primary btn-launch"
                         onClick={handleRun}
                         disabled={loading}
                     >
-                        {loading ? 'Processing...' : 'Run Maintenance Job'}
+                        <Play size={20} />
+                        {loading ? 'Launching...' : 'Launch Job'}
                     </button>
                 </div>
 
-                <div className="admin-card logs-card">
-                    <h2>System Logs</h2>
-                    <div className="logs-window">
-                        {logs.length === 0 && <span className="placeholder">Waiting for command...</span>}
-                        {logs.map((log, i) => (
-                            <div key={i} className="log-line">{log}</div>
-                        ))}
+                {/* Job History */}
+                <div className="admin-card">
+                    <div className="card-header">
+                        <h2>📋 Job History</h2>
+                        <button
+                            className="btn-refresh"
+                            onClick={fetchJobs}
+                            disabled={jobsLoading}
+                        >
+                            <RefreshCw size={18} className={jobsLoading ? 'spinning' : ''} />
+                            Refresh
+                        </button>
+                    </div>
+
+                    <div className="jobs-table-container">
+                        {jobs.length === 0 ? (
+                            <div className="empty-state">
+                                <Database size={48} />
+                                <p>No jobs yet. Launch your first maintenance job!</p>
+                            </div>
+                        ) : (
+                            <table className="jobs-table">
+                                <thead>
+                                    <tr>
+                                        <th>Status</th>
+                                        <th>Scopes</th>
+                                        <th>Users</th>
+                                        <th>Started</th>
+                                        <th>Message</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {jobs.map(job => (
+                                        <tr key={job.job_id} className={`status-${job.status}`}>
+                                            <td>
+                                                <span className={`status-badge status-${job.status}`}>
+                                                    {getStatusBadge(job.status)}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <div className="scope-tags">
+                                                    {job.scopes.map(scope => (
+                                                        <span key={scope} className="scope-tag">{scope}</span>
+                                                    ))}
+                                                </div>
+                                            </td>
+                                            <td>{job.target_user_ids.length} user(s)</td>
+                                            <td className="time-cell">
+                                                {new Date(job.created_at).toLocaleString()}
+                                            </td>
+                                            <td className="message-cell">{job.message || '-'}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
                     </div>
                 </div>
             </div>
