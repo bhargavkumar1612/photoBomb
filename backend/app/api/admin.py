@@ -146,7 +146,46 @@ async def trigger_admin_clustering(
         request
     )
 
+
     return {"status": "queued", "job_id": str(job.job_id), "message": "Job queued in background"}
+
+
+@router.post("/test-cluster-direct")
+async def test_cluster_direct(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Test endpoint: calls process_clustering_job directly without BackgroundTasks"""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+    
+    print(f"🧪 TEST: Calling process_clustering_job directly...", flush=True)
+    test_request = ClusterRequest(
+        target_user_ids=[current_user.user_id],
+        scopes=["faces"],
+        force_reset=False
+    )
+    
+    # Create a dummy job
+    job = AdminJob(
+        user_id=current_user.user_id,
+        job_type="test",
+        status="running",
+        target_user_ids=[str(current_user.user_id)],
+        scopes=["faces"],
+        force_reset=False,
+        message="Test job",
+        started_at=func.now()
+    )
+    db.add(job)
+    await db.commit()
+    await db.refresh(job)
+    
+    # Call directly
+    await process_clustering_job(job.job_id, test_request)
+    
+    return {"status": "test completed", "job_id": str(job.job_id)}
+
 
 async def process_clustering_job(job_id: uuid.UUID, request: ClusterRequest):
     """
