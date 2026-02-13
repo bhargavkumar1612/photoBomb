@@ -30,4 +30,4 @@ USER appuser
 
 EXPOSE 10000
 
-CMD ["./scripts/start_worker.sh"]
+CMD ["/bin/bash", "/app/scripts/start_worker.sh"]
