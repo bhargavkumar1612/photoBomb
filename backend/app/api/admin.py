@@ -129,6 +129,16 @@ async def trigger_admin_clustering(
     await db.commit()
     await db.refresh(job)
 
+    # TEST: Verify celery broker connection BEFORE background task
+    from app.celery_app import celery_app
+    try:
+        # Send a test ping to the broker
+        celery_app.broker_connection().ensure_connection(max_retries=3)
+        print(f"✅ Celery broker connection SUCCESS before BackgroundTask", flush=True)
+    except Exception as e:
+        print(f"❌ Celery broker connection FAILED: {e}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Celery broker unreachable: {e}")
+
     # Offload to background task
     background_tasks.add_task(
         process_clustering_job,
