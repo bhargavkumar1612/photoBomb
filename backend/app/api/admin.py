@@ -119,7 +119,7 @@ async def list_jobs(
             progress_current=p.completed_photos,
             progress_total=p.total_photos,
             message=p.description, # Map description to message
-            error=p.error_message,
+            error=p.error,
             created_at=created_at_str,
             started_at=started_at_str,
             completed_at=completed_at_str,
