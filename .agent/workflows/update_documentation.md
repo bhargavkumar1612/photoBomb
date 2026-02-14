@@ -2,46 +2,67 @@
 description: Check validity of documentation and update it with latest features/changes.
 ---
 
-This workflow guides you through checking the validity of the project's documentation and updating it to reflect the current state of the codebase. It also ensures the changelog is updated.
-
-## Prerequisites
-- Working knowledge of the current feature set and recent changes.
+This workflow updates all project documentation to reflect the current state of the codebase, including the CHANGELOG.
 
 ## Steps
 
-1. **Identify Recent Changes**:
-   - Only proceed if there are changes to documentation that need to be made.
-   - Review existing `task.md` and `implementation_plan.md` artifacts (in your brain or in `docs/` if available) to understand what was recently planned and implemented.
-   - Review your recent conversation history and `git log` (if available/relevant) to identify new features, bug fixes, or architectural changes since the last documentation update.
-   - Look for changes in `CHANGELOG.md` under [Unreleased] if it exists.
+1. **Review Current Changes**
+   - Check git status to see what files have been modified
+   - Review recent commits to understand what has changed
+   - Identify features, fixes, and refactoring that need documentation
 
-2. **Verify Feature Implementation**:
-   - For every new feature identified, verify its existence and implementation state in the codebase using `find_by_name` or `view_file` (e.g., check for new API endpoints, UI components, migration files).
-   - *Self-Correction*: Do not assume a feature mentioned in a plan is implemented. Always verify the code.
+2. **Update CHANGELOG.md**
+   - Extract the last commit hash from the current CHANGELOG.md (first version, since newest is on top):
+     ```bash
+     # Get the last version's commit hash (first 8 chars in the first version header)
+     LAST_COMMIT=$(grep -oP '(?<=\[)[a-f0-9]{8}(?=\]\[V)' CHANGELOG.md | head -1)
+     ```
+   - Run the changelog generator script in incremental mode:
+     ```bash
+     python3 scripts/generate_changelog.py --incremental --last-commit $LAST_COMMIT --output CHANGELOG.md
+     ```
+   - This will prepend new versions to CHANGELOG.md (newest on top), grouping every 20 commits since the last release
+   - **Note**: The changelog is in reverse chronological order - newest versions appear first
 
-3. **Check Documentation Validity**:
-   - Read `README.md`, `docs/PROGRESS.md` (or equivalent status doc), and `docs/architecture/system_architecture.md`.
-   - Compare the documented state with your verified codebase state.
-   - Note discrepancies (e.g., "Docs say feature X is planned, but code shows it's implemented", or "Docs describe architecture A, but code uses architecture B").
+3. **Update README.md**
+   - Review the README for accuracy
+   - Update feature lists if new features were added
+   - Update installation/setup instructions if dependencies changed
+   - Verify all links and references are still valid
 
-4. **Update Documentation**:
-   - Update `README.md` to include new major features and update any outdated setup instructions.
-   - Update `docs/PROGRESS.md`:
-     - Mark completed items as Checked (✅).
-     - Add newly implemented features to the list.
-     - Move items from "Planned" to "Implemented" where appropriate.
-   - Update Architecture Docs (`docs/architecture/*.md`):
-     - If architectural patterns changed (e.g., Auth flow, Storage strategy), update the relevant sections and diagrams.
+4. **Update PROGRESS.md (if exists)**
+   - Mark completed features as done
+   - Update completion percentages
+   - Add new planned features if discussed
+   - Update milestone dates if applicable
 
-5. **Update Changelog**:
-   - Open `CHANGELOG.md`.
-   - Add a new entry under `[Unreleased]` (or a new version header if releasing) describing:
-     - **Added**: New features.
-     - **Changed**: Modifications to existing functionality.
-     - **Deprecated/Removed**: Anything removed.
-     - **Fixed**: Bug fixes.
-   - Ensure specific, technical details are summarized clearly for developers.
+5. **Update Architecture Documentation**
+   - Check `docs/architecture/` for any files that need updates
+   - Update system diagrams if architecture changed
+   - Document new components or services
+   - Update API documentation if endpoints changed
 
-6. **Final Review**:
-   - Read through your changes to ensure consistency across all updated documents.
-   - Verify that no "Planned" items are falsely marked as "Complete" without code verification.
+6. **Update Deployment Documentation**
+   - Check `docs/deployment*.md` files
+   - Update deployment steps if CI/CD changed
+   - Document new environment variables
+   - Update infrastructure requirements
+
+7. **Verify Documentation Consistency**
+   - Ensure all documentation files are consistent with each other
+   - Check that version numbers match across files
+   - Verify code examples still work
+   - Test any commands or scripts mentioned in docs
+
+8. **Review and Commit**
+   - Review all documentation changes
+   - Commit with a clear message like "docs: update documentation for [feature/version]"
+   - Consider using the /commit_check workflow to generate a good commit message
+
+## Notes
+
+- The CHANGELOG is automatically generated from git commits in **reverse chronological order** (newest first)
+- Each version in CHANGELOG represents ~20 commits and uses format: `[commit_id[:8]][Vx.x.x]`
+- Always run the incremental changelog update to avoid regenerating the entire file
+- New versions are prepended to the top of the file, maintaining reverse chronological order
+- Documentation should be updated regularly, not just at release time
