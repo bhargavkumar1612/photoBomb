@@ -253,7 +253,6 @@ async def create_pipeline_with_tasks(
                 status='running',
                 total_photos=len(photo_ids),
                 config=config,
-                config=config,
                 started_at=datetime.utcnow(),
                 job_type=pipeline_type # Legacy field required by DB constraint
             )
