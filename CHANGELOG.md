@@ -1,7 +1,9 @@
-# CHANGELOG
-This changelog is automatically generated from git commit history.
-Each version represents approximately 20 commits.
-Versions are listed in reverse chronological order (newest first).
+## [a06f890][V0.0.8]
+
+### Features
+- feat(pipeline-monitoring): Implement comprehensive pipeline monitoring system
+- feat(pipeline-monitoring): Implement comprehensive pipeline monitoring system
+- feat: Introduce automated changelog generation script and update the existing changelog and documentation workflow.
 
 ## [1a2e19a][V0.0.7]
 
