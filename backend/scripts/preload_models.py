@@ -19,9 +19,12 @@ try:
     CLIPModel.from_pretrained("openai/clip-vit-base-patch32", cache_dir=cache_dir, use_safetensors=False)
     CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32", cache_dir=cache_dir, use_safetensors=False)
     
-    print("Downloading DETR model (facebook/detr-resnet-50)...")
-    DetrImageProcessor.from_pretrained("facebook/detr-resnet-50", cache_dir=cache_dir, use_safetensors=False)
-    DetrForObjectDetection.from_pretrained("facebook/detr-resnet-50", cache_dir=cache_dir, use_safetensors=False)
+    if os.environ.get("ANIMAL_DETECTION_ENABLED", "false").lower() == "true":
+        print("Downloading DETR model (facebook/detr-resnet-50)...")
+        DetrImageProcessor.from_pretrained("facebook/detr-resnet-50", cache_dir=cache_dir, use_safetensors=False)
+        DetrForObjectDetection.from_pretrained("facebook/detr-resnet-50", cache_dir=cache_dir, use_safetensors=False)
+    else:
+        print("Skipping DETR model (ANIMAL_DETECTION_ENABLED is not true)")
 
     # 2. Face Recognition Models (dlib)
     # These are usually downloaded by face_recognition at runtime to ~/.face_recognition_models
