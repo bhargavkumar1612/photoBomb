@@ -60,7 +60,15 @@ jobs:
           host: ${{ secrets.GCE_HOST }}
           username: ${{ secrets.GCE_USERNAME }}
           key: ${{ secrets.SSH_KEY }}
+          command_timeout: 30m
           script: |
+            echo "🧹 Cleaning up ALL Docker resources (Fresh Start)..."
+            if [ "$(sudo docker ps -aq)" ]; then
+                sudo docker stop $(sudo docker ps -aq)
+                sudo docker rm $(sudo docker ps -aq)
+            fi
+            sudo docker system prune -af --volumes
+
             cd /opt/photobomb || exit 1
             
             # Update .env

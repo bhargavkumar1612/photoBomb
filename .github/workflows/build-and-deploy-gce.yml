@@ -141,6 +141,13 @@ jobs:
             echo "🔍 Debugging .env file keys (Values masked):"
             awk -F= '{ if($1) print $1 }' .env
             
+            echo "🧹 Cleaning up ALL Docker resources (Fresh Start)..."
+            if [ "$(sudo docker ps -aq)" ]; then
+                sudo docker stop $(sudo docker ps -aq)
+                sudo docker rm $(sudo docker ps -aq)
+            fi
+            sudo docker system prune -af --volumes
+
             # Ensure network exists (Critical for first-time run)
             sudo docker network create photobomb_default || true
             
