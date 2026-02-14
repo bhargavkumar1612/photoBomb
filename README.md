@@ -283,7 +283,7 @@ See [docs/compliance.md](docs/compliance.md) for full checklist.
 ### Backend
 - **API**: FastAPI 0.104+ (Python 3.11+)
 - **GraphQL**: Strawberry 0.209+ (for complex queries)
-- **Workers**: Celery 5.3+ with Redis 7.2+
+- **Workers**: Celery 5.3+ with self-hosted Redis 7.2+ on GCE
 - **Auth**: JWT (PyJWT), bcrypt (cost 12)
 
 ### Database
@@ -357,4 +357,4 @@ See [docs/compliance.md](docs/compliance.md) for full checklist.
 
 **Built with ruthless attention to detail by [Your Team Name]**
 
-*Last Updated: January 2026*
+*Last Updated: February 2026*

@@ -40,6 +40,7 @@ services:
         condition: service_healthy
     environment:
       - DATABASE_URL=${DATABASE_URL}
+      - DB_SCHEMA=${DB_SCHEMA:-photobomb}
       - REDIS_PASSWORD=${REDIS_PASSWORD}
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
@@ -47,6 +48,7 @@ services:
       - B2_APPLICATION_KEY=${B2_APPLICATION_KEY}
       - B2_BUCKET_NAME=${B2_BUCKET_NAME}
       - B2_BUCKET_ID=${B2_BUCKET_ID}
+      - STORAGE_PATH_PREFIX=${STORAGE_PATH_PREFIX:-uploads}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - APP_ENV=${APP_ENV}
@@ -70,6 +72,7 @@ services:
         condition: service_healthy
     environment:
       - DATABASE_URL=${DATABASE_URL}
+      - DB_SCHEMA=${DB_SCHEMA:-photobomb}
       - REDIS_PASSWORD=${REDIS_PASSWORD}
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
@@ -78,9 +81,11 @@ services:
       - B2_BUCKET_NAME=${B2_BUCKET_NAME}
       - B2_BUCKET_ID=${B2_BUCKET_ID}
       - STORAGE_PATH_PREFIX=${STORAGE_PATH_PREFIX}
+      - STORAGE_PROVIDER=${STORAGE_PROVIDER:-b2_native}
       - APP_ENV=${APP_ENV}
       - ANIMAL_DETECTION_ENABLED=${ANIMAL_DETECTION_ENABLED:-false}
       - HF_TOKEN=${HF_TOKEN:-}
+      - FACE_RECOGNITION_ENABLED=${FACE_RECOGNITION_ENABLED:-true}
     volumes:
       - ./backend:/app
     networks:

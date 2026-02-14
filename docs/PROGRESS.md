@@ -35,6 +35,9 @@ A production-ready photo service (PWA) with full planning documentation and work
 - **Keyboard Accessibility** (Global focus management, Modal navigation, Keyboard shortcuts)
 - **Admin Dashboard** (Multi-user selection, Maintenance triggers, System logs)
 - **GCE Deployment Utilities** (Automated update script for remote workers)
+- **Self-Hosted Redis** (Migrated to GCE with password auth for stability)
+- **Admin Job Tracking** (AdminJob model for maintenance history)
+- **Production Infrastructure** (Split Docker Compose, granular GitHub Actions workflows)
 
 **📋 Planned:**
 - Search & Discovery (Text + Semantic)
@@ -423,4 +426,4 @@ All documentation is in `/docs` with comprehensive details:
 
 **Built with attention to detail and production-ready practices! 🚀**
 
-Last Updated: January 30, 2026
+Last Updated: February 14, 2026

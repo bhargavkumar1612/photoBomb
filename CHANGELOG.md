@@ -27,11 +27,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Animal Detection Parity**: Fully implemented Animal detection with dedicated API endpoints, filtering, and UI (feature parity with People).
 - **Admin Dashboard**: Comprehensive admin interface with multi-user selection (checklist UI), maintenance triggers (clustering, re-scanning), and live system logs.
 - **GCE Deployment Script**: Added `deploy_gce_worker.sh` to automate the update and restart process for remote Celery workers on Google Compute Engine.
+- **Self-Hosted Redis**: Migrated from Upstash to self-hosted Redis on GCE (35.226.33.89:6379) with password authentication for improved stability and cost reduction.
+- **Admin Job Tracking**: Added `AdminJob` model and database table to track maintenance job history (clustering, re-scanning) with status tracking and error logging.
+- **Admin Performance Indexes**: Added B-Tree indexes on `admin_jobs.status`, `admin_jobs.created_at`, and `admin_jobs.user_id` for faster job queries and filtering.
+- **Production Docker Compose**: Created `docker-compose.prod.yml` without code volume mounts to ensure production deployments use image code, not host code.
+- **GitHub Actions Workflows**: Split deployment workflows into `build-and-deploy-gce.yml` (full stack), `build-and-deploy-worker-only.yml` (worker-specific), and `deploy-redis-only.yml` (Redis-specific) for granular deployment control.
 
 ### Fixed
 - **Admin API Validation**: Resolved `ResponseValidationError` by handling `NULL` values for `is_admin` in the database.
 - **Admin Routing**: Fixed 404 error on `/admin/users` endpoint by correctly registering and implementing the listing function.
 - **Security**: Enforced strict role-based access control (RBAC) on admin routes in both Frontend (`AdminRoute`) and Backend.
+- **Celery Task Sending**: Fixed critical `ImportError` in `process_clustering_job()` where `async_session_factory` (non-existent) was imported instead of `AsyncSessionLocal`. This caused BackgroundTasks to fail silently before any debug logs ran, preventing tasks from reaching the GCE worker.
+- **BackgroundTask Silent Failures**: Added comprehensive debug logging with `print(..., flush=True)` and broker connection tests to expose Celery connection failures that Starlette's BackgroundTasks were silently swallowing.
+- **Admin API Performance**: Refactored `/admin/cluster` endpoint to use `BackgroundTasks` instead of synchronous processing, eliminating timeout issues for users with large photo collections.
+- **Worker Code Deployment**: Fixed production worker deployments by creating `docker-compose.prod.yml` without `./backend:/app` volume mounts, ensuring workers run image code instead of potentially empty/outdated host directories.
+- **GitHub Actions Triggers**: Updated workflow `paths` filters to include `docker-compose.prod.yml` and fixed deployment script permissions (`chmod +x start_worker.sh`).
 
 ### Changed
 - **Hashtag UI**: refined Hashtag Detail view to hide raw UUIDs, displaying a fallback title if the tag name is unresolvable, and sorting tags by confidence score.

@@ -429,13 +429,17 @@ def process_photo_analysis(self, upload_id: str, photo_id: str):
     Step 2: AI Analysis (Face, Objects, Animals, Text).
     Runs separately to avoid OOM.
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     async def _analyze():
         async with AsyncSessionLocal() as db:
             result = await db.execute(select(Photo).where(Photo.photo_id == photo_id))
             photo = result.scalar_one_or_none()
             
             if not photo:
-                print(f"Photo {photo_id} not found for analysis")
+                logger.warning(f"Photo {photo_id} not found for analysis - task will be skipped")
+                print(f"⚠️  Photo {photo_id} not found for analysis", flush=True)
                 return
 
             # Download again for analysis (clean slate for memory)
@@ -455,7 +459,8 @@ def process_photo_analysis(self, upload_id: str, photo_id: str):
                     # Download
                     original_bytes = storage.download_file_bytes(dest_key)
                 except Exception as e:
-                     print(f"Analysis: Could not download {dest_key}: {e}")
+                     logger.error(f"Analysis: Could not download {dest_key}: {e}")
+                     print(f"❌ Analysis: Could not download {dest_key}: {e}", flush=True)
                      return
 
                 with tempfile.NamedTemporaryFile(delete=False) as tmp:
@@ -481,10 +486,11 @@ def process_photo_analysis(self, upload_id: str, photo_id: str):
                         
                         np_image = np.array(rgb_img)
                         
-                    print(f"Detecting faces in {photo.filename}...")
+                    print(f"🔍 Detecting faces in {photo.filename}...", flush=True)
                     # Detect faces (HOG-based model is faster, cnn is more accurate but requires GPU)
                     face_locations = face_recognition.face_locations(np_image, model="hog")
-                    print(f"Found {len(face_locations)} faces")
+                    print(f"✅ Found {len(face_locations)} faces", flush=True)
+                    logger.info(f"Found {len(face_locations)} faces in photo {photo_id}")
                     
                     if face_locations:
                         face_encodings = face_recognition.face_encodings(np_image, face_locations)
@@ -507,10 +513,13 @@ def process_photo_analysis(self, upload_id: str, photo_id: str):
                             face_key = f"{settings.STORAGE_PATH_PREFIX}/{photo.user_id}/faces/{new_face.face_id}.jpg"
                             save_crop(storage, tmp_path, (top, right, bottom, left), face_key, padding=0.4)
                             
-                except ImportError:
-                    print("Face recognition libraries not found/installed. Skipping.")
+                except ImportError as e:
+                    logger.error(f"Face recognition libraries not installed: {e}")
+                    print("❌ Face recognition libraries not found/installed. Skipping.", flush=True)
                 except Exception as e:
-                    print(f"Error in face recognition: {e}")
+                    logger.exception(f"Error in face recognition for photo {photo_id}: {e}")
+                    print(f"💥 Error in face recognition: {e}", flush=True)
+
 
                 # 4d. Animal Detection (DETR + CLIP) - Only if enabled
                 if settings.ANIMAL_DETECTION_ENABLED:
