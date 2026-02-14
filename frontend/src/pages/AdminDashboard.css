@@ -217,7 +217,7 @@
     cursor: pointer;
 }
 
-.scope-card input[type="checkbox"]:checked ~ .scope-content {
+.scope-card input[type="checkbox"]:checked~.scope-content {
     color: #667eea;
 }
 
@@ -334,8 +334,13 @@
 }
 
 @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 /* Jobs Table */
@@ -436,4 +441,22 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.btn-icon {
+    background: none;
+    border: none;
+    color: #6b7280;
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 4px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-icon:hover {
+    background: #f3f4f6;
+    color: #4f46e5;
 }

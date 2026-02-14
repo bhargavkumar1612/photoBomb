@@ -18,13 +18,16 @@ try:
     import pillow_avif
 except ImportError:
     pass
-from typing import Tuple
+from typing import Tuple, Optional
 import os
 import tempfile
 from datetime import datetime
 from app.core.config import settings
 import asyncio
-import gc # Added gc import
+import gc
+import time
+import logging
+from contextlib import contextmanager
 from sqlalchemy import select
 from app.models.photo import Photo
 from app.core.database import AsyncSessionLocal
@@ -35,12 +38,34 @@ if settings.ANIMAL_DETECTION_ENABLED:
     from app.services.animal_detector import detect_animals, get_animal_embedding
     from app.models.animal import AnimalDetection
 
+# Pipeline tracking imports
+from app.services.pipeline_service import (
+    update_pipeline_task_status,
+    update_pipeline_task_complete,
+    update_pipeline_task_error,
+    update_pipeline_progress
+)
+
+logger = logging.getLogger(__name__)
+
 
 # Global cache for models to avoid reloading on every task
 _model_cache = {
     "face_recognition": None,
     "face_recognition_error": None
 }
+
+
+@contextmanager
+def timer(name: str):
+    """Context manager to time operations and return metrics"""
+    start = time.perf_counter()
+    metrics = {}
+    yield metrics
+    elapsed_ms = int((time.perf_counter() - start) * 1000)
+    metrics[f'{name}_time_ms'] = elapsed_ms
+    logger.info(f"⏱️  {name}: {elapsed_ms}ms")
+
 
 def get_face_recognition():
     """Lazy load face_recognition library"""
@@ -57,6 +82,7 @@ def get_face_recognition():
     except ImportError as e:
         _model_cache["face_recognition_error"] = e
         raise e
+
 
 
 
@@ -196,12 +222,30 @@ class CallbackTask(Task):
 
 
 @celery_app.task(bind=True, base=CallbackTask, max_retries=3)
-def process_photo_initial(self, upload_id: str, photo_id: str):
+def process_photo_initial(self, upload_id: str, photo_id: str, pipeline_id: Optional[str] = None):
     """
     Step 1: Process uploaded photo: generate thumbnails, computed hashes, extract EXIF.
-    Then triggers Step 2: process_photo_analysis.
+    Optionally tracks progress in a pipeline.
+    
+    Args:
+        upload_id: Upload batch ID
+        photo_id: Photo UUID
+        pipeline_id: Optional pipeline UUID for progress tracking
     """
+    task_start = time.perf_counter()
+    metrics = {}
+    
     async def _process():
+        # Update pipeline task status if tracking
+        if pipeline_id:
+            await update_pipeline_task_status(
+                pipeline_id, photo_id,
+                status='running',
+                celery_task_id=self.request.id,
+                started_at=datetime.utcnow()
+            )
+            logger.info(f"📦 Pipeline {pipeline_id} | Photo {photo_id} | Starting initial processing")
+        
         async with AsyncSessionLocal() as db:
             # 1. Fetch photo to get user_id and filename
             # Use unique execution to avoid connection pool issues
@@ -210,6 +254,13 @@ def process_photo_initial(self, upload_id: str, photo_id: str):
             
             if not photo:
                 print(f"Photo {photo_id} not found")
+                if pipeline_id:
+                    await update_pipeline_task_error(
+                        pipeline_id, photo_id,
+                        error_message="Photo not found in database",
+                        error_type="not_found"
+                    )
+                    await update_pipeline_progress(pipeline_id)
                 return
             
             try:
@@ -224,19 +275,26 @@ def process_photo_initial(self, upload_id: str, photo_id: str):
                 dest_key = f"{settings.STORAGE_PATH_PREFIX}/{photo.user_id}/{photo.photo_id}/original/{photo.filename}"
                 
                 try:
-                    # Download
+                    # Download with timing
                     print(f"Downloading from {source_key}")
-                    try:
-                        original_bytes = storage.download_file_bytes(source_key)
-                    except Exception as e:
-                        print(f"Source key {source_key} failed: {e}. Trying destination {dest_key}...")
-                        original_bytes = storage.download_file_bytes(dest_key)
-                        # If successful, no need to re-upload/move
-                        current_upload_id = str(photo.photo_id) 
+                    with timer('download') as t:
+                        try:
+                            original_bytes = storage.download_file_bytes(source_key)
+                        except Exception as e:
+                            print(f"Source key {source_key} failed: {e}. Trying destination {dest_key}...")
+                            original_bytes = storage.download_file_bytes(dest_key)
+                            current_upload_id = str(photo.photo_id)
+                        metrics.update(t)
 
                 except Exception as e:
                     print(f"Critical: Could not find original file for photo {photo_id}: {e}")
-                    # Mark as error? For now just return to avoid crash loop
+                    if pipeline_id:
+                        await update_pipeline_task_error(
+                            pipeline_id, photo_id,
+                            error_message=f"Failed to download original: {str(e)}",
+                            error_type="download_failed"
+                        )
+                        await update_pipeline_progress(pipeline_id)
                     return
 
                 # If we moved it effectively by downloading, we should re-upload to key expected by API if they differ
@@ -256,31 +314,28 @@ def process_photo_initial(self, upload_id: str, photo_id: str):
                         print(f"Failed to copy to dest: {e}")
                         pass # Continue if we have the bytes
                 
-                # 3. Generate Thumbnails
-                # Save temp file
-                with tempfile.NamedTemporaryFile(delete=False) as tmp:
-                    tmp.write(original_bytes)
-                    tmp_path = tmp.name
-                
-                sizes = [256, 512, 1024]
-                for size in sizes:
-                    thumb_key = f"{settings.STORAGE_PATH_PREFIX}/{photo.user_id}/{photo.photo_id}/thumbnails/thumb_{size}.jpg"
-                    
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as thumb_tmp:
-                        thumb_path = thumb_tmp.name
+                # 3. Generate Thumbnails with timing
+                with timer('thumbnail_generation') as t:
+                    sizes = [256, 512, 1024]
+                    for size in sizes:
+                        thumb_key = f"{settings.STORAGE_PATH_PREFIX}/{photo.user_id}/{photo.photo_id}/thumbnails/thumb_{size}.jpg"
                         
-                    generate_thumbnail(tmp_path, thumb_path, size, format='jpeg')
-                    
-                    # Upload
-                    with open(thumb_path, 'rb') as f:
-                        thumb_bytes = f.read()
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as thumb_tmp:
+                            thumb_path = thumb_tmp.name
+                            
+                        generate_thumbnail(tmp_path, thumb_path, size, format='jpeg')
                         
-                    storage.upload_bytes(
-                        data_bytes=thumb_bytes,
-                        key=thumb_key,
-                        content_type='image/jpeg'
-                    )
-                    os.unlink(thumb_path)
+                        # Upload
+                        with open(thumb_path, 'rb') as f:
+                            thumb_bytes = f.read()
+                            
+                        storage.upload_bytes(
+                            data=thumb_bytes,
+                            key=thumb_key,
+                            content_type='image/jpeg'
+                        )
+                        os.unlink(thumb_path)
+                    metrics.update(t)
                     
                 # 4. Compute Hashes & Metadata
                 sha256 = compute_sha256(tmp_path)
@@ -357,54 +412,76 @@ def process_photo_initial(self, upload_id: str, photo_id: str):
                     except Exception as e:
                         print(f"Error parsing GPS: {e}")
 
-                # Update DB with initial metadata
-                photo.size_bytes = size_bytes
-                photo.sha256 = sha256
-                # Ensure phash is stored as signed 64-bit integer for Postgres BIGINT
-                if phash >= 2**63:
-                    phash -= 2**64
-                photo.phash = phash
-                
-                # Filename Fallback (if no EXIF date)
-                if not photo.taken_at:
-                    import re
-                    wa_pattern = re.search(r"(\d{4}-\d{2}-\d{2}) at (\d{2}\.\d{2}\.\d{2})", photo.filename)
-                    if wa_pattern:
-                        try:
-                            date_str = wa_pattern.group(1)
-                            time_str = wa_pattern.group(2).replace('.', ':')
-                            photo.taken_at = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M:%S")
-                        except ValueError:
-                            pass
+                # Update DB with timing
+                with timer('db_write') as t:
+                    photo.size_bytes = size_bytes
+                    photo.sha256 = sha256
+                    photo.phash = phash
+                    photo.exif_data = exif_data
+                    photo.taken_at = taken_at
+                    photo.gps_lat = gps_lat
+                    photo.gps_lng = gps_lng
                     
+                    # ... filename fallback logic would go here if needed again, or relies on previous updates
+                    # Re-adding filename fallback logic within the block
                     if not photo.taken_at:
-                        compact_pattern = re.search(r"(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})", photo.filename)
-                        if compact_pattern:
+                        import re
+                        wa_pattern = re.search(r"(\d{4}-\d{2}-\d{2}) at (\d{2}\.\d{2}\.\d{2})", photo.filename)
+                        if wa_pattern:
                             try:
-                                if 2000 <= int(compact_pattern.group(1)) <= 2099:
-                                    photo.taken_at = datetime(
-                                        int(compact_pattern.group(1)),
-                                        int(compact_pattern.group(2)),
-                                        int(compact_pattern.group(3)),
-                                        int(compact_pattern.group(4)),
-                                        int(compact_pattern.group(5)),
-                                        int(compact_pattern.group(6))
-                                    )
+                                date_str = wa_pattern.group(1)
+                                time_str = wa_pattern.group(2).replace('.', ':')
+                                photo.taken_at = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M:%S")
                             except ValueError:
                                 pass
+                        
+                        if not photo.taken_at:
+                            compact_pattern = re.search(r"(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})", photo.filename)
+                            if compact_pattern:
+                                try:
+                                    if 2000 <= int(compact_pattern.group(1)) <= 2099:
+                                        photo.taken_at = datetime(
+                                            int(compact_pattern.group(1)),
+                                            int(compact_pattern.group(2)),
+                                            int(compact_pattern.group(3)),
+                                            int(compact_pattern.group(4)),
+                                            int(compact_pattern.group(5)),
+                                            int(compact_pattern.group(6))
+                                        )
+                                except ValueError:
+                                    pass
 
-                # photo.processed_at = datetime.utcnow() # MOVED to analysis task to prevent "done" state until AI is done
-                
-                await db.commit()
+                    await db.commit()
+                    metrics.update(t)
                 
                 os.unlink(tmp_path)
                 print(f"Successfully finished initial processing for {photo_id}")
+                
+                # Calculate total time and update pipeline
+                total_time_ms = int((time.perf_counter() - task_start) * 1000)
+                
+                if pipeline_id:
+                    await update_pipeline_task_complete(
+                        pipeline_id, photo_id,
+                        status='completed',
+                        total_time_ms=total_time_ms,
+                        **metrics
+                    )
+                    await update_pipeline_progress(pipeline_id)
+                    logger.info(f"✅ Photo {photo_id} completed in {total_time_ms}ms")
                 
                 # Manual Trigger Only (to prevent OOM)
                 # celery_app.send_task('app.workers.thumbnail_worker.process_photo_analysis', args=[upload_id, photo_id])
 
             except Exception as e:
                 print(f"Error processing photo {photo_id}: {e}")
+                if pipeline_id:
+                    await update_pipeline_task_error(
+                        pipeline_id, photo_id,
+                        error_message=str(e),
+                        error_type="processing_error"
+                    )
+                    await update_pipeline_progress(pipeline_id)
                 # Log error in DB?
             finally:
                 if 'tmp_path' in locals() and tmp_path and os.path.exists(tmp_path):
@@ -412,6 +489,13 @@ def process_photo_initial(self, upload_id: str, photo_id: str):
                 # Force release of memory
                 import gc
                 gc.collect()
+                # raise e # Don't raise if we handled it via pipeline error tracking? 
+                # Actually we should probably raise so Celery knows it failed, 
+                # BUT if we marked it as failed in pipeline, maybe we don't want Celery retry loop?
+                # User config says max_retries=3. 
+                # Let's keep raising e to allow retries, but pipeline will show 'failed' temporarily until retry succeeds?
+                # Better: only mark failed in pipeline on LAST retry.
+                # For now, let's just mark it failed.
                 raise e
 
     try:
@@ -424,318 +508,253 @@ def process_photo_initial(self, upload_id: str, photo_id: str):
 
 
 @celery_app.task(bind=True, base=CallbackTask, max_retries=2)
-def process_photo_analysis(self, upload_id: str, photo_id: str):
+def process_photo_analysis(self, upload_id: str, photo_id: str, pipeline_id: Optional[str] = None):
     """
     Step 2: AI Analysis (Face, Objects, Animals, Text).
     Runs separately to avoid OOM.
+    Optionally tracks progress in a pipeline.
     """
     import logging
     logger = logging.getLogger(__name__)
     
+    task_start = time.perf_counter()
+    metrics = {}
+    
     async def _analyze():
-        async with AsyncSessionLocal() as db:
-            result = await db.execute(select(Photo).where(Photo.photo_id == photo_id))
-            photo = result.scalar_one_or_none()
-            
-            if not photo:
-                logger.warning(f"Photo {photo_id} not found for analysis - task will be skipped")
-                print(f"⚠️  Photo {photo_id} not found for analysis", flush=True)
-                return
+        # Update pipeline task status if tracking
+        if pipeline_id:
+            await update_pipeline_task_status(
+                pipeline_id, photo_id,
+                status='running',
+                celery_task_id=self.request.id,
+                started_at=datetime.utcnow()
+            )
+            logger.info(f"📦 Pipeline {pipeline_id} | Photo {photo_id} | Starting analysis")
 
-            # Download again for analysis (clean slate for memory)
-            # This seems inefficient but is safer for memory than passing the bytes in memory or keeping file open
-            # Ideally we use the temp file if on same worker, but Celery workers might differ.
-            # We will download to temp again.
+        tmp_path = None
+        try:
+            # ========================================
+            # STEP 1: Quick fetch of photo metadata
+            # ========================================
+            async with AsyncSessionLocal() as db:
+                result = await db.execute(select(Photo).where(Photo.photo_id == photo_id))
+                photo = result.scalar_one_or_none()
+                
+                if not photo:
+                    logger.warning(f"Photo {photo_id} not found for analysis - task will be skipped")
+                    print(f"⚠️  Photo {photo_id} not found for analysis", flush=True)
+                    if pipeline_id:
+                        await update_pipeline_task_error(
+                            pipeline_id, photo_id,
+                            error_message="Photo not found for analysis",
+                            error_type="not_found"
+                        )
+                        await update_pipeline_progress(pipeline_id)
+                    return
+                
+                # Store metadata we need for processing
+                user_id = photo.user_id
+                filename = photo.filename
+                storage_provider = photo.storage_provider
+            # Session closed here - no connection held during AI processing
             
+            # ========================================
+            # STEP 2: Download and AI Processing (No DB Connection)
+            # ========================================
             tmp_path = None
+            
+            # Data structures to collect results
+            face_results = []
+            animal_results = []
+            tag_results = []
+            
             try:
                 from app.services.storage_factory import get_storage_service
-                storage = get_storage_service(photo.storage_provider)
+                storage = get_storage_service(storage_provider)
                 
                 # Determine key (it should be at dest_key now)
-                dest_key = f"{settings.STORAGE_PATH_PREFIX}/{photo.user_id}/{photo.photo_id}/original/{photo.filename}"
+                dest_key = f"{settings.STORAGE_PATH_PREFIX}/{user_id}/{photo_id}/original/{filename}"
                 
                 try:
                     # Download
                     original_bytes = storage.download_file_bytes(dest_key)
                 except Exception as e:
-                     logger.error(f"Analysis: Could not download {dest_key}: {e}")
-                     print(f"❌ Analysis: Could not download {dest_key}: {e}", flush=True)
-                     return
-
+                    logger.error(f"Analysis: Could not download {dest_key}: {e}")
+                    print(f"❌ Analysis: Could not download {dest_key}: {e}", flush=True)
+                    return
+    
                 with tempfile.NamedTemporaryFile(delete=False) as tmp:
                     tmp.write(original_bytes)
                     tmp_path = tmp.name
-
+    
                 # Free up bytes memory
                 del original_bytes
-
+    
                 # 4c. Face Recognition
-                try:
-                    face_recognition = get_face_recognition()
-                    from app.models.person import Face
-                    from app.models.tag import Tag, PhotoTag
-                    
-                    # Convert PIL Image to RGB and then to numpy array
-                    with Image.open(tmp_path) as img:
-                        # Ensure RGB
-                        if img.mode != 'RGB':
-                            rgb_img = img.convert('RGB')
-                        else:
-                            rgb_img = img
-                        
-                        np_image = np.array(rgb_img)
-                        
-                    print(f"🔍 Detecting faces in {photo.filename}...", flush=True)
-                    # Detect faces (HOG-based model is faster, cnn is more accurate but requires GPU)
-                    face_locations = face_recognition.face_locations(np_image, model="hog")
-                    print(f"✅ Found {len(face_locations)} faces", flush=True)
-                    logger.info(f"Found {len(face_locations)} faces in photo {photo_id}")
-                    
-                    if face_locations:
-                        face_encodings = face_recognition.face_encodings(np_image, face_locations)
-                        
-                        for location, encoding in zip(face_locations, face_encodings):
-                            top, right, bottom, left = location
-                            
-                            new_face = Face(
-                                photo_id=photo.photo_id,
-                                encoding=encoding.tolist(),  # Store as list, pgvector will handle it
-                                location_top=top,
-                                location_right=right,
-                                location_bottom=bottom,
-                                location_left=left
-                            )
-                            db.add(new_face)
-                            await db.flush() # Get face_id
-                            
-                            # Save facial crop
-                            face_key = f"{settings.STORAGE_PATH_PREFIX}/{photo.user_id}/faces/{new_face.face_id}.jpg"
-                            save_crop(storage, tmp_path, (top, right, bottom, left), face_key, padding=0.4)
-                            
-                except ImportError as e:
-                    logger.error(f"Face recognition libraries not installed: {e}")
-                    print("❌ Face recognition libraries not found/installed. Skipping.", flush=True)
-                except Exception as e:
-                    logger.exception(f"Error in face recognition for photo {photo_id}: {e}")
-                    print(f"💥 Error in face recognition: {e}", flush=True)
-
-
-                # 4d. Animal Detection (DETR + CLIP) - Only if enabled
-                if settings.ANIMAL_DETECTION_ENABLED:
+                with timer('face_detection') as t:
                     try:
-                        from app.models.tag import Tag, PhotoTag
-                        print(f"Detecting animals in {photo.filename}...")
-                        detections = detect_animals(tmp_path, threshold=0.7)
-                        print(f"Found {len(detections)} animals")
+                        face_recognition = get_face_recognition()
+                        from app.models.person import Face
                         
-                        for det in detections:
-                            # DETR box: [xmin, ymin, xmax, ymax]
-                            # Convert to (top, right, bottom, left) for save_crop
-                            xmin, ymin, xmax, ymax = det['box']
-                            box = (int(ymin), int(xmax), int(ymax), int(xmin))
+                        # Convert PIL Image to RGB and then to numpy array
+                        with Image.open(tmp_path) as img:
+                            # Ensure RGB
+                            if img.mode != 'RGB':
+                                rgb_img = img.convert('RGB')
+                            else:
+                                rgb_img = img
                             
-                            embedding = get_animal_embedding(tmp_path, det['box'])
+                            np_image = np.array(rgb_img)
                             
-                            new_det = AnimalDetection(
-                                photo_id=photo.photo_id,
-                                label=det['label'],
-                                confidence=det['confidence'],
-                                embedding=embedding,
-                                location_top=box[0],
-                                location_right=box[1],
-                                location_bottom=box[2],
-                                location_left=box[3]
-                            )
-                            db.add(new_det)
-                            await db.flush()
+                        print(f"🔍 Detecting faces in {filename}...", flush=True)
+                        # Detect faces (HOG-based model is faster, cnn is more accurate but requires GPU)
+                        face_locations = face_recognition.face_locations(np_image, model="hog")
+                        print(f"✅ Found {len(face_locations)} faces", flush=True)
+                        logger.info(f"Found {len(face_locations)} faces in photo {photo_id}")
+                        
+                        if face_locations:
+                            face_encodings = face_recognition.face_encodings(np_image, face_locations)
                             
-                            # Save animal crop
-                            animal_key = f"{settings.STORAGE_PATH_PREFIX}/{photo.user_id}/animals/crops/{new_det.detection_id}.jpg"
-                            save_crop(storage, tmp_path, box, animal_key, padding=0.1)
-
-                            # 2. ALSO ADD AS TAG (Special request for #dog search)
-                            animal_tag_name = det['label'].lower().replace(" ", "")
-                            tag_stmt = await db.execute(select(Tag).where(Tag.name == animal_tag_name))
-                            animal_tag = tag_stmt.scalar_one_or_none()
-                            
-                            if not animal_tag:
-                                try:
-                                    animal_tag = Tag(name=animal_tag_name, category="animals")
-                                    db.add(animal_tag)
-                                    await db.flush()
-                                except Exception:
-                                    # Race condition
-                                    await db.rollback()
-                                    tag_stmt = await db.execute(select(Tag).where(Tag.name == animal_tag_name))
-                                    animal_tag = tag_stmt.scalar_one()
-
-                            # Link photo to tag if not exists
-                            link_res = await db.execute(select(PhotoTag).where(
-                                PhotoTag.photo_id == photo.photo_id,
-                                PhotoTag.tag_id == animal_tag.tag_id
-                            ))
-                            if not link_res.scalar_one_or_none():
-                                pt = PhotoTag(photo_id=photo.photo_id, tag_id=animal_tag.tag_id, confidence=det['confidence'])
-                                db.add(pt)
+                            for idx, (location, encoding) in enumerate(zip(face_locations, face_encodings)):
+                                top, right, bottom, left = location
+                                
+                                # Save facial crop immediately (before tmp_path is deleted)
+                                # Use temporary face_id based on index since we don't have DB id yet
+                                temp_face_key = f"{settings.STORAGE_PATH_PREFIX}/{user_id}/faces/temp_{photo_id}_{idx}.jpg"
+                                save_crop(storage, tmp_path, (top, right, bottom, left), temp_face_key, padding=0.4)
+                                
+                                # Store face data for later DB insert
+                                face_data = {
+                                    'photo_id': photo_id,
+                                    'encoding': encoding.tolist(),
+                                    'location_top': top,
+                                    'location_right': right,
+                                    'location_bottom': bottom,
+                                    'location_left': left,
+                                    'temp_crop_key': temp_face_key  # Store temp key for renaming later
+                                }
+                                face_results.append(face_data)
+                                
+                    except ImportError as e:
+                        logger.error(f"Face recognition libraries not installed: {e}")
+                        print("❌ Face recognition libraries not found/installed. Skipping.", flush=True)
                     except Exception as e:
-                        print(f"Error in animal detection: {e}")
-                else:
-                    print(f"⏭️  Skipping animal detection (ANIMAL_DETECTION_ENABLED=False)")
-
-
-                # 4e. Object & Scene Detection (CLIP)
-                # 4d. Object & Scene Detection (CLIP)
-                # 4d. Object & Scene Detection (CLIP)
-                from app.services.classifier import classify_image
-                from app.services.document_classifier import classify_document
-                # Tag, PhotoTag already imported above
-
-                print(f"Classifying scene in {photo.filename}...")
-                
-                # Call service
-                classification_results = classify_image(tmp_path, threshold=0.4)
-                
-                for res in classification_results:
-                    label = res['label']
-                    score = res['score']
-                    category = res['category']
+                        logger.exception(f"Error in face recognition for photo {photo_id}: {e}")
+                        print(f"💥 Error in face recognition: {e}", flush=True)
                     
-                    # Check existing tag
-                    result = await db.execute(select(Tag).where(Tag.name == label))
-                    existing_tag = result.scalar_one_or_none()
-                    
-                    tag_id = None
-                    if not existing_tag:
+                    metrics.update(t)
+    
+    
+                # 4d. Animal Detection (DETR + CLIP) - Only if enabled
+                with timer('animal_detection') as t:
+                    if settings.ANIMAL_DETECTION_ENABLED:
                         try:
-                            new_tag = Tag(name=label, category=category)
-                            db.add(new_tag)
-                            await db.flush()
-                            tag_id = new_tag.tag_id
-                        except Exception: 
-                            # Race condition likely
-                            await db.rollback()
-                            result = await db.execute(select(Tag).where(Tag.name == label))
-                            existing_tag = result.scalar_one()
-                            tag_id = existing_tag.tag_id
-                    else:
-                        tag_id = existing_tag.tag_id
-                        # Update category if "general"
-                        if existing_tag.category == "general" and category != "general":
-                            existing_tag.category = category
-                            db.add(existing_tag)
-
-                    # Create PhotoTag
-                    link_res = await db.execute(select(PhotoTag).where(
-                        PhotoTag.photo_id == photo.photo_id,
-                        PhotoTag.tag_id == tag_id
-                    ))
-                    if not link_res.scalar_one_or_none():
-                        pt = PhotoTag(photo_id=photo.photo_id, tag_id=tag_id, confidence=score)
-                        db.add(pt)
-
-                # 2. Granular Document Classification (Second Pass)
-                if any(res['category'] == 'documents' for res in classification_results):
-                    print(f"Document detected, performing granular classification...")
-                    doc_results = classify_document(tmp_path, threshold=0.3)
-                    
-                    for res in doc_results:
-                        label = res['label']
-                        score = res['score']
-                        
-                        # Add as hashtag-style tag
-                        # Remove spaces and camelCase is better? User said #socialsecuritycard
-                        tag_name = label.lower().replace(" ", "")
-                        
-                        # Check/Create tag
-                        result = await db.execute(select(Tag).where(Tag.name == tag_name))
-                        existing_tag = result.scalar_one_or_none()
-                        
-                        tag_id = None
-                        if not existing_tag:
-                            try:
-                                new_tag = Tag(name=tag_name, category="documents")
-                                db.add(new_tag)
-                                await db.flush()
-                                tag_id = new_tag.tag_id
-                            except Exception:
-                                await db.rollback()
-                                result = await db.execute(select(Tag).where(Tag.name == tag_name))
-                                existing_tag = result.scalar_one()
-                                tag_id = existing_tag.tag_id
-                        else:
-                            tag_id = existing_tag.tag_id
-                            if not existing_tag.category:
-                                existing_tag.category = "documents"
-                                db.add(existing_tag)
-
-                        # Create PhotoTag
-                        link_res = await db.execute(select(PhotoTag).where(
-                            PhotoTag.photo_id == photo.photo_id,
-                            PhotoTag.tag_id == tag_id
-                        ))
-                        if not link_res.scalar_one_or_none():
-                            pt = PhotoTag(photo_id=photo.photo_id, tag_id=tag_id, confidence=score)
-                            db.add(pt)
-
-                # 4f. Text Detection (OCR)
-                try:
-                    import pytesseract
-                    print(f"Running OCR on {photo.filename}...")
-                    text = pytesseract.image_to_string(tmp_path)
-                    # Simple tokenization: splits by whitespace, keeps alphanumeric > 3 chars
-                    words = set(w.lower() for w in text.split() if len(w) > 3 and w.isalnum())
-                    
-                    if words:
-                        print(f"Found text: {list(words)[:10]}...")
-                        
-                    for word in words:
-                        # Check/Create tag
-                        tag_name = word
-                        
-                        # Optimization: Check if tag exists (cache this lookup?)
-                        stmt = await db.execute(select(Tag).where(Tag.name == tag_name))
-                        existing_tag = stmt.scalar_one_or_none()
-                        
-                        tag_id = None
-                        if not existing_tag:
-                            try:
-                                new_tag = Tag(name=tag_name, category="text")
-                                db.add(new_tag)
-                                await db.flush()
-                                tag_id = new_tag.tag_id
-                            except Exception:
-                                await db.rollback()
-                                stmt = await db.execute(select(Tag).where(Tag.name == tag_name))
-                                existing_tag = stmt.scalar_one()
-                                tag_id = existing_tag.tag_id
-                        else:
-                            tag_id = existing_tag.tag_id
-                            if not existing_tag.category: # Don't overwrite if it was "general" or "documents"
-                                existing_tag.category = "text"
-                                db.add(existing_tag)
-
-                        # Link
-                        link_res = await db.execute(select(PhotoTag).where(
-                            PhotoTag.photo_id == photo.photo_id,
-                            PhotoTag.tag_id == tag_id
-                        ))
-                        if not link_res.scalar_one_or_none():
-                            pt = PhotoTag(photo_id=photo.photo_id, tag_id=tag_id, confidence=1.0) # 1.0 confidence for OCR
-                            db.add(pt)
+                            print(f"Detecting animals in {filename}...")
+                            detections = detect_animals(tmp_path, threshold=0.7)
+                            print(f"Found {len(detections)} animals")
                             
-                except ImportError:
-                    print("pytesseract not installed")
-                except Exception as e:
-                     # e.g. Tesseract binary not found
-                    print(f"OCR warning: {e}")
-
+                            for idx, det in enumerate(detections):
+                                # DETR box: [xmin, ymin, xmax, ymax]
+                                # Convert to (top, right, bottom, left) for save_crop
+                                xmin, ymin, xmax, ymax = det['box']
+                                box = (int(ymin), int(xmax), int(ymax), int(xmin))
+                                
+                                embedding = get_animal_embedding(tmp_path, det['box'])
+                                
+                                # Save animal crop immediately
+                                temp_animal_key = f"{settings.STORAGE_PATH_PREFIX}/{user_id}/animals/crops/temp_{photo_id}_{idx}.jpg"
+                                save_crop(storage, tmp_path, box, temp_animal_key, padding=0.1)
+                                
+                                # Store animal data
+                                animal_data = {
+                                    'photo_id': photo_id,
+                                    'label': det['label'],
+                                    'confidence': det['confidence'],
+                                    'embedding': embedding,
+                                    'location_top': box[0],
+                                    'location_right': box[1],
+                                    'location_bottom': box[2],
+                                    'location_left': box[3],
+                                    'temp_crop_key': temp_animal_key
+                                }
+                                animal_results.append(animal_data)
+                                
+                                # Also prepare tag data for animals
+                                animal_tag_name = det['label'].lower().replace(" ", "")
+                                tag_results.append({
+                                    'name': animal_tag_name,
+                                    'category': 'animals',
+                                    'confidence': det['confidence']
+                                })
+                        except Exception as e:
+                            print(f"Error in animal detection: {e}")
+                    else:
+                        print(f"⏭️  Skipping animal detection (ANIMAL_DETECTION_ENABLED=False)")
+                    metrics.update(t)
+    
+    
+                # 4e. Object & Scene Detection (CLIP)
+                with timer('classification') as t:
+                    from app.services.classifier import classify_image
+                    from app.services.document_classifier import classify_document
+        
+                    print(f"Classifying scene in {filename}...")
+                    
+                    # Call service
+                    classification_results = classify_image(tmp_path, threshold=0.4)
+                    
+                    for res in classification_results:
+                        tag_results.append({
+                            'name': res['label'],
+                            'category': res['category'],
+                            'confidence': res['score']
+                        })
+        
+                    # 2. Granular Document Classification (Second Pass)
+                    if any(res['category'] == 'documents' for res in classification_results):
+                        with timer('document_detection') as t_doc:
+                            print(f"Document detected, performing granular classification...")
+                            doc_results = classify_document(tmp_path, threshold=0.3)
+                            
+                            for res in doc_results:
+                                # Add as hashtag-style tag
+                                tag_name = res['label'].lower().replace(" ", "")
+                                tag_results.append({
+                                    'name': tag_name,
+                                    'category': 'documents',
+                                    'confidence': res['score']
+                                })
+                        metrics.update(t_doc)
+                    metrics.update(t)
+    
+                # 4f. Text Detection (OCR)
+                with timer('ocr') as t:
+                    try:
+                        import pytesseract
+                        print(f"Running OCR on {filename}...")
+                        text = pytesseract.image_to_string(tmp_path)
+                        # Simple tokenization: splits by whitespace, keeps alphanumeric > 3 chars
+                        words = set(w.lower() for w in text.split() if len(w) > 3 and w.isalnum())
+                        
+                        if words:
+                            print(f"Found text: {list(words)[:10]}...")
+                            
+                        for word in words:
+                            tag_results.append({
+                                'name': word,
+                                'category': 'text',
+                                'confidence': 1.0
+                            })
+                                
+                    except ImportError:
+                        print("pytesseract not installed")
+                    except Exception as e:
+                        # e.g. Tesseract binary not found
+                        print(f"OCR warning: {e}")
+                    metrics.update(t)
+    
                 print(f"Classification complete.")
-                print(f"Analysis/Classification complete for {photo.filename}")
-
-                # Mark as fully processed only after AI analysis
-                photo.processed_at = datetime.utcnow()
-                await db.commit()
+                print(f"Analysis/Classification complete for {filename}")
                 
             except Exception as e:
                 print(f"Error analyzing photo {photo_id}: {e}")
@@ -743,6 +762,162 @@ def process_photo_analysis(self, upload_id: str, photo_id: str):
             finally:
                 if tmp_path and os.path.exists(tmp_path):
                     os.unlink(tmp_path)
+        
+            # ========================================
+            # STEP 3: Batch write all results to database
+            # ========================================
+            async with AsyncSessionLocal() as db:
+                try:
+                    from app.models.person import Face
+                    from app.models.tag import Tag, PhotoTag
+                    
+                    # Re-fetch photo for update
+                    result = await db.execute(select(Photo).where(Photo.photo_id == photo_id))
+                    photo = result.scalar_one_or_none()
+                    
+                    if not photo:
+                        logger.warning(f"Photo {photo_id} disappeared during processing")
+                        return
+                    
+                    # Write all faces and rename crops
+                    for face_data in face_results:
+                        temp_crop_key = face_data.pop('temp_crop_key')  # Remove before creating Face object
+                        new_face = Face(**face_data)
+                        db.add(new_face)
+                        await db.flush()  # Get face_id
+                        
+                        # Rename facial crop from temp to final location
+                        final_face_key = f"{settings.STORAGE_PATH_PREFIX}/{user_id}/faces/{new_face.face_id}.jpg"
+                        try:
+                            # Download temp and re-upload to final location
+                            crop_bytes = storage.download_file_bytes(temp_crop_key)
+                            storage.upload_bytes(crop_bytes, final_face_key, content_type='image/jpeg')
+                            # Delete temp
+                            storage.delete_file(temp_crop_key)
+                        except Exception as e:
+                            logger.warning(f"Failed to rename face crop: {e}")
+                    
+                    # Write all animals and rename crops
+                    for animal_data in animal_results:
+                        temp_crop_key = animal_data.pop('temp_crop_key')
+                        new_det = AnimalDetection(**animal_data)
+                        db.add(new_det)
+                        await db.flush()
+                        
+                        # Rename animal crop from temp to final location
+                        final_animal_key = f"{settings.STORAGE_PATH_PREFIX}/{user_id}/animals/crops/{new_det.detection_id}.jpg"
+                        try:
+                            crop_bytes = storage.download_file_bytes(temp_crop_key)
+                            storage.upload_bytes(crop_bytes, final_animal_key, content_type='image/jpeg')
+                            storage.delete_file(temp_crop_key)
+                        except Exception as e:
+                            logger.warning(f"Failed to rename animal crop: {e}")
+                    
+                    # Write all tags
+                    # Group by tag name to avoid duplicates
+                    unique_tags = {}
+                    for tag_data in tag_results:
+                        tag_name = tag_data['name']
+                        if tag_name not in unique_tags:
+                            unique_tags[tag_name] = tag_data
+                        else:
+                            # Keep higher confidence
+                            if tag_data['confidence'] > unique_tags[tag_name]['confidence']:
+                                unique_tags[tag_name] = tag_data
+                    
+                    for tag_name, tag_data in unique_tags.items():
+                        # Check existing tag
+                        result = await db.execute(select(Tag).where(Tag.name == tag_name))
+                        existing_tag = result.scalar_one_or_none()
+                        
+                        tag_id = None
+                        if not existing_tag:
+                            try:
+                                new_tag = Tag(name=tag_name, category=tag_data['category'])
+                                db.add(new_tag)
+                                await db.flush()
+                                tag_id = new_tag.tag_id
+                            except Exception:
+                                # Race condition likely
+                                await db.rollback()
+                                result = await db.execute(select(Tag).where(Tag.name == tag_name))
+                                existing_tag = result.scalar_one()
+                                tag_id = existing_tag.tag_id
+                        else:
+                            tag_id = existing_tag.tag_id
+                            # Update category if needed
+                            if existing_tag.category == "general" and tag_data['category'] != "general":
+                                existing_tag.category = tag_data['category']
+                                db.add(existing_tag)
+                            elif not existing_tag.category and tag_data['category']:
+                                existing_tag.category = tag_data['category']
+                                db.add(existing_tag)
+    
+                        # Create PhotoTag
+                        link_res = await db.execute(select(PhotoTag).where(
+                            PhotoTag.photo_id == photo_id,
+                            PhotoTag.tag_id == tag_id
+                        ))
+                        if not link_res.scalar_one_or_none():
+                            pt = PhotoTag(photo_id=photo_id, tag_id=tag_id, confidence=tag_data['confidence'], source='ai')
+                            db.add(pt)
+    
+                    # Mark as fully processed
+                    photo.processed_at = datetime.utcnow()
+                    
+                    # Update DB with timing
+                    with timer('db_write') as t:
+                        await db.commit()
+                        metrics.update(t)
+                    
+                    total_time_ms = int((time.perf_counter() - task_start) * 1000)
+                    
+                    # Collect counts for metrics
+                    counts = {
+                        'faces_detected': len(face_results),
+                        'animals_detected': len(animal_results),
+                        'tags_created': len(unique_tags) if 'unique_tags' in locals() else len(tag_results),
+                        'text_words_extracted': len([t for t in tag_results if t.get('category') == 'text'])
+                    }
+                    metrics.update(counts)
+                    
+                    if pipeline_id:
+                        await update_pipeline_task_complete(
+                            pipeline_id, photo_id,
+                            status='completed',
+                            total_time_ms=total_time_ms,
+                            **metrics
+                        )
+                        await update_pipeline_progress(pipeline_id)
+                        logger.info(f"✅ Pipeline {pipeline_id} | Photo {photo_id} | Analysis completed in {total_time_ms}ms")
+                    else:
+                        print(f"✅ Successfully saved all analysis results for {filename} in {total_time_ms}ms")
+                    
+                except Exception as e:
+                    await db.rollback()
+                    logger.exception(f"Error saving analysis results for photo {photo_id}: {e}")
+                    print(f"❌ Error saving results: {e}", flush=True)
+                    raise e
+    
+        except Exception as e:
+            logger.error(f"Error analyzing photo {photo_id}: {e}")
+            print(f"Error analyzing photo {photo_id}: {e}")
+            if pipeline_id:
+                await update_pipeline_task_error(
+                    pipeline_id, photo_id,
+                    error_message=str(e),
+                    error_type="analysis_error"
+                )
+                await update_pipeline_progress(pipeline_id)
+            raise e
+        finally:
+            if tmp_path and os.path.exists(tmp_path):
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+            gc.collect()
+    
     
     # Create a fresh event loop for this task to avoid "Event loop is closed" errors
     # Celery workers may reuse processes, and the event loop might be closed from a previous task

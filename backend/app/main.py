@@ -66,6 +66,9 @@ app.include_router(hashtags_api.router, prefix="/api/v1/hashtags", tags=["hashta
 app.include_router(tags.router, prefix="/api/v1/tags", tags=["tags"])
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["admin"])
 
+from app.api import pipelines
+app.include_router(pipelines.router, prefix="/api/v1/pipelines", tags=["pipelines"])
+
 
 @app.get("/")
 async def root():

@@ -19,6 +19,7 @@ from app.api.auth import get_current_user, get_current_user_id
 from app.models.user import User
 from app.models.photo import Photo, PhotoFile
 from app.services.storage_factory import get_storage_service
+from app.services.pipeline_service import create_pipeline_with_tasks
 from app.core.config import settings
 
 router = APIRouter()
@@ -763,16 +764,34 @@ async def rescan_photos(
     result = await db.execute(query)
     photos = result.scalars().all()
     
+    if not photos:
+        return {"message": "No photos found to rescan", "count": 0}
+
+    # Create Pipeline
+    photo_ids = [p.photo_id for p in photos]
+    photo_filenames = {str(p.photo_id): p.filename for p in photos}
+    
+    pipeline_id = await create_pipeline_with_tasks(
+        user_id=current_user.user_id,
+        pipeline_type='rescan',
+        photo_ids=photo_ids,
+        photo_filenames=photo_filenames,
+        name=f"Rescan {len(photos)} photos",
+        description=f"Manual rescan triggered by user. Process all: {process_all}"
+    )
+    
     count = 0
     for photo in photos:
         # We pass upload_id=photo_id to indicate the file is already in its final location
         celery_app.send_task(
             'app.workers.thumbnail_worker.process_photo_initial',
-            args=[str(photo.photo_id), str(photo.photo_id)]
+            args=[str(photo.photo_id), str(photo.photo_id)],
+            kwargs={'pipeline_id': pipeline_id}
         )
         count += 1
         
     return {
         "message": f"Triggered rescan for {count} photos.",
-        "count": count
+        "count": count,
+        "pipeline_id": pipeline_id
     }

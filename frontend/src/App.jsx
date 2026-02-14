@@ -24,6 +24,7 @@ import HashtagsPage from './pages/HashtagsPage'
 import HashtagDetailPage from './pages/HashtagDetailPage'
 import PlaceholderPage from './pages/PlaceholderPage'
 import AdminDashboard from './pages/AdminDashboard'
+import PipelineDetail from './pages/PipelineDetail'
 import UploadProgressWidget from './components/UploadProgressWidget'
 import './App.css'
 
@@ -145,6 +146,11 @@ function AppRoutes() {
                 <Route path="/admin" element={
                     <AdminRoute>
                         <AdminDashboard />
+                    </AdminRoute>
+                } />
+                <Route path="/admin/pipelines/:id" element={
+                    <AdminRoute>
+                        <PipelineDetail />
                     </AdminRoute>
                 } />
             </Route>

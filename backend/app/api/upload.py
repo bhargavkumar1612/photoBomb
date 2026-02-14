@@ -13,6 +13,7 @@ from app.core.database import get_db
 from app.api.auth import get_current_user
 from app.models.user import User
 from app.models.photo import Photo
+from app.models.pipeline import Pipeline, PipelineTask
 from app.services.storage_factory import get_storage_service
 from app.core.config import settings
 from app.celery_app import celery_app
@@ -50,6 +51,7 @@ class PresignResponse(BaseModel):
 class ConfirmRequest(BaseModel):
     upload_id: str
     etags: Optional[list] = None
+    pipeline_id: Optional[str] = None
 
 
 class ConfirmResponse(BaseModel):
@@ -158,11 +160,37 @@ async def confirm_upload(
     )
     
     db.add(photo)
+    await db.flush() # Get photo_id
+    
+    # Associate with Pipeline if provided
+    if request.pipeline_id:
+        # Verify pipeline
+        result = await db.execute(select(Pipeline).where(Pipeline.pipeline_id == request.pipeline_id))
+        pipeline = result.scalar_one_or_none()
+        
+        if pipeline:
+            # Create PipelineTask
+            task = PipelineTask(
+                pipeline_id=pipeline.pipeline_id,
+                photo_id=photo.photo_id,
+                photo_filename=photo.filename,
+                status='queued'
+            )
+            db.add(task)
+            # Update pipeline total_photos? Or assume it was set correctly beforehand?
+            # If dynamic add, we should increment total_photos
+            pipeline.total_photos += 1
+            db.add(pipeline)
+            
     await db.commit()
     await db.refresh(photo)
     
     # Enqueue Celery    # Trigger processing task (initial only)
-    celery_app.send_task('app.workers.thumbnail_worker.process_photo_initial', args=[request.upload_id, str(photo.photo_id)])
+    celery_app.send_task(
+        'app.workers.thumbnail_worker.process_photo_initial',
+        args=[request.upload_id, str(photo.photo_id)],
+        kwargs={'pipeline_id': request.pipeline_id} if request.pipeline_id else {}
+    )
     
     return ConfirmResponse(
         photo_id=str(photo.photo_id),

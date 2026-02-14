@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useFeatures } from '../context/FeaturesContext'
-import { RefreshCw, Play, Users as UsersIcon, Image, Database } from 'lucide-react'
+import { RefreshCw, Play, Users as UsersIcon, Image, Database, ExternalLink } from 'lucide-react'
 import api from '../services/api'
+import pipelineService from '../services/pipelineService'
 import './AdminDashboard.css'
 
 export default function AdminDashboard() {
     const { user } = useAuth()
+    const navigate = useNavigate()
     const { animal_detection_enabled } = useFeatures()
     const [scopes, setScopes] = useState({
         faces: true,
@@ -32,7 +35,6 @@ export default function AdminDashboard() {
             const userData = Array.isArray(res.data) ? res.data : []
             setUsers(userData)
             setStats(prev => ({ ...prev, totalUsers: userData.length }))
-            // Select current user by default
             // Select current user by default only if valid
             if (user && user.user_id) {
                 setSelectedUserIds(new Set([user.user_id]))
@@ -45,7 +47,8 @@ export default function AdminDashboard() {
     const fetchJobs = async () => {
         setJobsLoading(true)
         try {
-            const res = await api.get('/admin/jobs?limit=10')
+            // Use new service
+            const res = await pipelineService.getAdminJobs(10)
             const jobsData = Array.isArray(res.data) ? res.data : []
             setJobs(jobsData)
         } catch (err) {
@@ -85,7 +88,9 @@ export default function AdminDashboard() {
 
         setLoading(true)
         try {
-            await api.post('/admin/cluster', {
+            // Use pipeline service (which maps to /admin/cluster or generic create)
+            // Ideally backend admin/cluster maps to this.
+            await pipelineService.triggerCluster({
                 target_user_ids: Array.from(selectedUserIds),
                 scopes: selectedScopes,
                 force_reset: forceReset
@@ -259,9 +264,9 @@ export default function AdminDashboard() {
                                     <tr>
                                         <th>Status</th>
                                         <th>Scopes</th>
-                                        <th>Users</th>
+                                        <th>Info</th>
                                         <th>Started</th>
-                                        <th>Message</th>
+                                        <th>Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -279,11 +284,22 @@ export default function AdminDashboard() {
                                                     ))}
                                                 </div>
                                             </td>
-                                            <td>{(job.target_user_ids || []).length} user(s)</td>
+                                            <td className="time-cell">
+                                                <div>{(job.target_user_ids || []).length} user(s)</div>
+                                                <div className="message-cell" title={job.message}>{job.message || '-'}</div>
+                                            </td>
                                             <td className="time-cell">
                                                 {job.created_at ? new Date(job.created_at).toLocaleString() : '-'}
                                             </td>
-                                            <td className="message-cell">{job.message || '-'}</td>
+                                            <td>
+                                                <button
+                                                    className="btn-icon"
+                                                    title="View Details"
+                                                    onClick={() => navigate(`/admin/pipelines/${job.job_id}`)}
+                                                >
+                                                    <ExternalLink size={16} />
+                                                </button>
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>

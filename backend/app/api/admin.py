@@ -1,20 +1,23 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete, update
+from sqlalchemy import select, delete, update, desc
 from pydantic import BaseModel, field_validator
 from typing import List, Optional
 import uuid
+from datetime import datetime
 
 from app.core.database import get_db
 from app.models.user import User
 from app.api.auth import get_current_user
-from app.services.face_clustering import cluster_faces
-from app.services.animal_clustering import cluster_animals
 from app.models.person import Person
-from app.models.animal import Animal
 from app.models.photo import Photo
-from app.models.admin_job import AdminJob
+# Replaced AdminJob with Pipeline
+from app.models.pipeline import Pipeline, PipelineTask
 from sqlalchemy import func
+import logging
+
+# Configure logger
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -34,6 +37,7 @@ class AdminUserResponse(BaseModel):
     def set_false_if_none(cls, v):
         return v or False
 
+# Mapped to match old AdminJobResponse for frontend compatibility
 class AdminJobResponse(BaseModel):
     job_id: uuid.UUID
     job_type: str
@@ -45,10 +49,12 @@ class AdminJobResponse(BaseModel):
     progress_total: int
     message: Optional[str]
     error: Optional[str]
-    created_at: str
+    created_at: Optional[str]
     started_at: Optional[str]
     completed_at: Optional[str]
 
+    class Config:
+        from_attributes = True
 
 @router.get("/users", response_model=List[AdminUserResponse])
 async def list_users(
@@ -69,35 +75,57 @@ async def list_jobs(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get recent admin jobs with their status."""
+    """
+    Get recent admin jobs with their status.
+    Now queries the `pipelines` table and maps it to the expected format.
+    """
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Admin privileges required")
     
+    # Query Pipelines that are 'admin_cluster' type (or legacy types)
+    # We include 'admin_cluster' and others to be safe, or just filter by prefix 'admin_'?
+    # For now, let's grab all or filter by relevant types if needed. 
+    # The existing frontend expects 'cluster' jobs mainly.
     result = await db.execute(
-        select(AdminJob)
-        .order_by(AdminJob.created_at.desc())
+        select(Pipeline)
+        .where(Pipeline.pipeline_type.in_(['admin_cluster', 'batch_analysis', 'rescan']))
+        .order_by(desc(Pipeline.created_at))
         .limit(limit)
     )
-    jobs = result.scalars().all()
+    pipelines = result.scalars().all()
     
-    return [
-        AdminJobResponse(
-            job_id=job.job_id,
-            job_type=job.job_type,
-            status=job.status,
-            scopes=job.scopes,
-            target_user_ids=[uuid.UUID(uid) for uid in job.target_user_ids],
-            force_reset=job.force_reset,
-            progress_current=job.progress_current,
-            progress_total=job.progress_total,
-            message=job.message,
-            error=job.error,
-            created_at=job.created_at.isoformat() if job.created_at else None,
-            started_at=job.started_at.isoformat() if job.started_at else None,
-            completed_at=job.completed_at.isoformat() if job.completed_at else None,
-        )
-        for job in jobs
-    ]
+    # Map Pipeline -> AdminJobResponse
+    response_list = []
+    for p in pipelines:
+        # Extract config to reconstruct AdminJob fields
+        config = p.config or {}
+        
+        # Determine job_type for frontend (if it expects specific strings)
+        job_type = p.pipeline_type
+        if job_type == 'admin_cluster':
+            job_type = 'cluster'
+            
+        created_at_str = p.created_at.isoformat() if p.created_at else None
+        started_at_str = p.started_at.isoformat() if p.started_at else None
+        completed_at_str = p.completed_at.isoformat() if p.completed_at else None
+
+        response_list.append(AdminJobResponse(
+            job_id=p.pipeline_id,
+            job_type=job_type,
+            status=p.status,
+            scopes=config.get('scopes', []),
+            target_user_ids=[uuid.UUID(uid) for uid in config.get('target_user_ids', [])],
+            force_reset=config.get('force_reset', False),
+            progress_current=p.completed_photos,
+            progress_total=p.total_photos,
+            message=p.description, # Map description to message
+            error=p.error_message,
+            created_at=created_at_str,
+            started_at=started_at_str,
+            completed_at=completed_at_str,
+        ))
+        
+    return response_list
 
 
 @router.post("/cluster")
@@ -109,109 +137,58 @@ async def trigger_admin_clustering(
 ):
     """
     Admin-only endpoint to trigger heavy maintenance tasks.
-    Supports running on multiple users.
+    Creates a Pipeline record and starts processing.
     """
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Admin privileges required")
 
-    # Create job record
-    job = AdminJob(
-        user_id=current_user.user_id,
-        job_type="cluster",
-        status="running",
-        target_user_ids=[str(uid) for uid in request.target_user_ids],
-        scopes=request.scopes,
-        force_reset=request.force_reset,
-        message="Job started",
-        started_at=func.now()
-    )
-    db.add(job)
-    await db.commit()
-    await db.refresh(job)
+    # config json for the pipeline
+    config = {
+        "scopes": request.scopes,
+        "target_user_ids": [str(uid) for uid in request.target_user_ids],
+        "force_reset": request.force_reset
+    }
 
-    # TEST: Verify celery broker connection BEFORE background task
-    from app.celery_app import celery_app
-    try:
-        # Send a test ping to the broker
-        celery_app.broker_connection().ensure_connection(max_retries=3)
-        print(f"✅ Celery broker connection SUCCESS before BackgroundTask", flush=True)
-    except Exception as e:
-        print(f"❌ Celery broker connection FAILED: {e}", flush=True)
-        raise HTTPException(status_code=500, detail=f"Celery broker unreachable: {e}")
+    # Create Pipeline record
+    pipeline = Pipeline(
+        user_id=current_user.user_id,
+        pipeline_type="admin_cluster",
+        name=f"Admin Cluster: {', '.join(request.scopes)}",
+        description="Job started",
+        status="running",
+        config=config,
+        started_at=func.now(),
+        total_photos=0, # Will be updated by background task
+        completed_photos=0
+    )
+    db.add(pipeline)
+    await db.commit()
+    await db.refresh(pipeline)
 
     # Offload to background task
     background_tasks.add_task(
         process_clustering_job,
-        job.job_id,
+        pipeline.pipeline_id,
         request
     )
 
-
-    return {"status": "queued", "job_id": str(job.job_id), "message": "Job queued in background"}
-
-
-@router.post("/test-cluster-direct")
-async def test_cluster_direct(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
-    """Test endpoint: calls process_clustering_job directly without BackgroundTasks"""
-    if not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="Admin privileges required")
-    
-    print(f"🧪 TEST: Calling process_clustering_job directly...", flush=True)
-    test_request = ClusterRequest(
-        target_user_ids=[current_user.user_id],
-        scopes=["faces"],
-        force_reset=False
-    )
-    
-    # Create a dummy job
-    job = AdminJob(
-        user_id=current_user.user_id,
-        job_type="test",
-        status="running",
-        target_user_ids=[str(current_user.user_id)],
-        scopes=["faces"],
-        force_reset=False,
-        message="Test job",
-        started_at=func.now()
-    )
-    db.add(job)
-    await db.commit()
-    await db.refresh(job)
-    
-    # Call directly
-    await process_clustering_job(job.job_id, test_request)
-    
-    return {"status": "test completed", "job_id": str(job.job_id)}
+    return {"status": "queued", "job_id": str(pipeline.pipeline_id), "message": "Job queued in background"}
 
 
-async def process_clustering_job(job_id: uuid.UUID, request: ClusterRequest):
+async def process_clustering_job(pipeline_id: uuid.UUID, request: ClusterRequest):
     """
     Background task to handle the actual clustering logic.
-    Note: We need a new session or careful management if db is passed.
-    Actually, FastAPI dependency injection for 'db' closes the session after request.
-    So we might need to handle session within this function if we can't reuse the request one safely.
-    For simplicity in this refactor, we'll try to use the passed session but ideally we should create a new one.
-    However, since we are in async context, let's keep it simple first. 
-    Actually, safe way is to pass the logic to a service function that manages its own transaction or assumes one.
-    But to avoid 'Session is closed' errors, we should be careful.
-    
-    Correction: The 'db' session from Depends(get_db) is closed after the response is sent.
-    We CANNOT use it in background_tasks.
-    We need to create a new session generator here.
+    Updates the Pipeline record.
     """
-    # Re-import to avoid circular dependency if needed, or use the global SessionLocal like get_db does
     from app.core.database import AsyncSessionLocal
     
     async with AsyncSessionLocal() as session:
-        print(f"🔄 BackgroundTask started for job {job_id}, scopes={request.scopes}", flush=True)
+        print(f"🔄 BackgroundTask started for pipeline {pipeline_id}, scopes={request.scopes}", flush=True)
         try:
-             # Fetch job again to update it
-            result = await session.execute(select(AdminJob).where(AdminJob.job_id == job_id))
-            job = result.scalar_one_or_none()
-            if not job:
+             # Fetch pipeline to update it
+            result = await session.execute(select(Pipeline).where(Pipeline.pipeline_id == pipeline_id))
+            pipeline = result.scalar_one_or_none()
+            if not pipeline:
                 return
 
             results = []
@@ -230,23 +207,21 @@ async def process_clustering_job(job_id: uuid.UUID, request: ClusterRequest):
                 # 1. Faces
                 if "faces" in request.scopes:
                     if request.force_reset:
-                        # Delete all persons for user (Faces will be set to NULL via CASCADE SET NULL)
+                        # Delete all persons for user
                         await session.execute(delete(Person).where(Person.user_id == user_id))
                         await session.commit()
                         user_msg.append("Faces reset")
                     
                     from app.celery_app import celery_app
                     try:
+                        # Trigger face clustering worker
                         celery_app.send_task('app.workers.face_worker.cluster_faces', args=[str(user_id)])
-                        print(f"✅ Face clustering task sent for user {user_id}", flush=True)
                         user_msg.append("Face clustering queued")
                     except Exception as e:
-                        print(f"❌ Failed to send face clustering task: {e}", flush=True)
                         user_msg.append(f"Face clustering FAILED: {e}")
 
                 # 2. Animals
                 if "animals" in request.scopes:
-                    # animal clustering service handles reset logic internally
                     from app.celery_app import celery_app
                     try:
                         celery_app.send_task(
@@ -254,82 +229,85 @@ async def process_clustering_job(job_id: uuid.UUID, request: ClusterRequest):
                             args=[str(user_id)],
                             kwargs={'force_reset': request.force_reset}
                         )
-                        print(f"✅ Animal clustering task sent for user {user_id}", flush=True)
                         user_msg.append("Animal clustering queued")
                     except Exception as e:
-                        print(f"❌ Failed to send animal clustering task: {e}", flush=True)
                         user_msg.append(f"Animal clustering FAILED: {e}")
 
-                # 3. Hashtags (Re-scan)
+                # 3. Hashtags / Rescan (The main part that uses PipelineTasks)
                 if "hashtags" in request.scopes:
+                    # Fetch photos to process
+                    query = select(Photo).where(Photo.user_id == user_id, Photo.deleted_at == None)
+                    
                     if request.force_reset:
-                        # Mark all photos as unprocessed
+                        # Reset processed status
                         await session.execute(
                             update(Photo)
                             .where(Photo.user_id == user_id)
                             .values(processed_at=None)
                         )
                         await session.commit()
-                        
+                        user_msg.append("Reset processed status")
+                    else:
+                        # Only retry unprocessed
+                        query = query.where(Photo.processed_at == None)
+
+                    # Execute query
+                    photo_result = await session.execute(query)
+                    photos = photo_result.scalars().all()
+                    
+                    if photos:
                         from app.celery_app import celery_app
-                        # Fetch all photos to queue
-                        result = await session.execute(select(Photo).where(Photo.user_id == user_id))
-                        photos = result.scalars().all()
-                        
+                        # Add to total count
+                        pipeline.total_photos += len(photos)
+                        await session.commit()
+
                         count = 0
                         for photo in photos:
                             try:
+                                # Create PipelineTask record
+                                task = PipelineTask(
+                                    pipeline_id=pipeline_id,
+                                    photo_id=photo.photo_id,
+                                    photo_filename=photo.filename,
+                                    status='queued'
+                                )
+                                session.add(task)
+                                # Send task with pipeline_id
                                 celery_app.send_task(
                                     'app.workers.thumbnail_worker.process_photo_analysis',
-                                    args=[str(photo.photo_id), str(photo.photo_id)]
+                                    args=[str(photo.photo_id), str(photo.photo_id)],
+                                    kwargs={'pipeline_id': str(pipeline_id)}
                                 )
                                 count += 1
                             except Exception as e:
-                                print(f"❌ Failed to send hashtag task: {e}", flush=True)
-                                break
-                        user_msg.append(f"Rescan triggered for {count} photos")
+                                print(f"❌ Failed to send task: {e}", flush=True)
+                        
+                        await session.commit()
+                        user_msg.append(f"Queued {count} photos for analysis")
                     else:
-                        # Retry unprocessed
-                        result = await session.execute(
-                            select(Photo).where(
-                                Photo.user_id == user_id,
-                                Photo.deleted_at == None,
-                                Photo.processed_at == None
-                            )
-                        )
-                        photos = result.scalars().all()
-                        if photos:
-                            from app.celery_app import celery_app
-                            count = 0
-                            for photo in photos:
-                                try:
-                                    celery_app.send_task(
-                                        'app.workers.thumbnail_worker.process_photo_analysis',
-                                        args=[str(photo.photo_id), str(photo.photo_id)]
-                                    )
-                                    count += 1
-                                except Exception as e:
-                                    print(f"❌ Failed to send retry hashtag task: {e}", flush=True)
-                                    break
-                            user_msg.append(f"Retrying analysis for {count} unprocessed photos")
-                
+                        user_msg.append("No photos to rescan")
+
                 if user_msg:
                      results.append(f"{prefix} {', '.join(user_msg)}")
                 else:
                      results.append(f"{prefix} No scopes selected")
 
-            # Update job as completed
-            job.status = "completed"
-            job.completed_at = func.now()
-            job.message = " | ".join(results)
+            # Update pipeline 
+            has_async_tasks = "hashtags" in request.scopes and pipeline.total_photos > 0
+            
+            pipeline.description = " | ".join(results)
+            if not has_async_tasks:
+                pipeline.status = "completed"
+                pipeline.completed_at = func.now()
+            
             await session.commit()
             
         except Exception as e:
             print(f"💥 Error in background clustering: {e}", flush=True)
             # Try to update job status to failed
             try:
-                job.status = "failed"
-                job.error = str(e)
+                pipeline.status = "failed"
+                pipeline.error_message = str(e)
                 await session.commit()
             except:
                 pass
