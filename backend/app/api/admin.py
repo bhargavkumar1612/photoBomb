@@ -159,7 +159,9 @@ async def trigger_admin_clustering(
         config=config,
         started_at=func.now(),
         total_photos=0, # Will be updated by background task
-        completed_photos=0
+        total_photos=0, # Will be updated by background task
+        completed_photos=0,
+        job_type="cluster" # Legacy field required by DB constraint
     )
     db.add(pipeline)
     await db.commit()
