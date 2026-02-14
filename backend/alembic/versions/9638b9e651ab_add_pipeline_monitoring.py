@@ -11,7 +11,7 @@ from sqlalchemy.dialects import postgresql
 from app.core.config import settings
 
 # revision identifiers, used by Alembic.
-revision = '9638b9e651ab'
+revision = 'add_pipeline_monitoring'
 down_revision = '80af9f6500bd'  # Latest migration
 branch_labels = None
 depends_on = None
