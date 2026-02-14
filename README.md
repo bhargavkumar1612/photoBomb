@@ -17,6 +17,7 @@ PhotoBomb is a comprehensive production plan for building a full-featured photo 
 - **Visual Hashtags** via CLIP AI (automatic tagging for animals, documents, etc.)
 - **Premium Gallery UI**: Glassmorphism aesthetics, responsive layouts, and optimistic interactions.
 - **Place Recognition** with GPS extraction and reverse geocoding
+- **Pipeline Monitoring** with real-time progress, granular task tracking, and detailed metrics
 - **PWA installable** on Android/iOS (offline uploads, service worker)
 - **Privacy-first design** (GDPR/CCPA compliant, user data control)
 - **Cost-optimized architecture** (~$15-60/month for 1-20TB storage)

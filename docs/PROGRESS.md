@@ -37,6 +37,7 @@ A production-ready photo service (PWA) with full planning documentation and work
 - **GCE Deployment Utilities** (Automated update script for remote workers)
 - **Self-Hosted Redis** (Migrated to GCE with password auth for stability)
 - **Admin Job Tracking** (AdminJob model for maintenance history)
+- **Pipeline Monitoring System** (Real-time progress, granular task tracking, metrics, cancellations)
 - **Production Infrastructure** (Split Docker Compose, granular GitHub Actions workflows)
 
 **📋 Planned:**
