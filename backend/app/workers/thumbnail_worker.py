@@ -744,13 +744,27 @@ def process_photo_analysis(self, upload_id: str, photo_id: str):
                 if tmp_path and os.path.exists(tmp_path):
                     os.unlink(tmp_path)
     
+    # Create a fresh event loop for this task to avoid "Event loop is closed" errors
+    # Celery workers may reuse processes, and the event loop might be closed from a previous task
     try:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
     except RuntimeError:
+        # No running loop, create a new one
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        
-    return loop.run_until_complete(_analyze())
+    else:
+        # There's a running loop, but it might be closed. Create a new one to be safe.
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    try:
+        return loop.run_until_complete(_analyze())
+    finally:
+        # Clean up the loop after task completion
+        try:
+            loop.close()
+        except Exception:
+            pass  # Ignore errors when closing the loop
 
 
 

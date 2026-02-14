@@ -22,6 +22,13 @@ if [ "$(sudo docker ps -q -f name=photo-worker)" ]; then
     sudo docker rm photo-worker
 fi
 
+# Stop and remove backend if running (shouldn't be on GCE)
+if [ "$(sudo docker ps -q -f name=photobomb-backend)" ]; then
+    echo "🛑 Removing backend container (should only be on Render)..."
+    sudo docker stop photobomb-backend
+    sudo docker rm photobomb-backend
+fi
+
 echo "⬇️ Pulling latest images..."
 # We explicitly pull to ensure we get the latest
 sudo docker compose pull worker redis
@@ -31,8 +38,22 @@ echo "▶️ Restarting services..."
 # --remove-orphans cleans up old containers not in the compose file
 sudo docker compose up -d --remove-orphans worker redis
 
-echo "🧹 Cleaning up old images..."
-sudo docker image prune -f
+echo "🧹 Aggressive cleanup to free disk space..."
+# Remove unused containers
+sudo docker container prune -f
+
+# Remove unused images (keeps only images used by running containers)
+sudo docker image prune -a -f
+
+# Remove unused volumes
+sudo docker volume prune -f
+
+# Remove build cache (can save significant space)
+sudo docker builder prune -a -f
+
+# Show disk usage after cleanup
+echo "📊 Docker disk usage after cleanup:"
+sudo docker system df
 
 echo "✅ Deployment Complete!"
 sudo docker compose ps
